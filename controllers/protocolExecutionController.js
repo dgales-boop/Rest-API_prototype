@@ -1,34 +1,17 @@
 const { v4: uuidv4 } = require("uuid");
-const crypto = require("crypto");
+
 const ProtocolExecution = require("../models/protocolExecution");
 
-// Shared secret for HMAC-SHA256 webhook signing
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || "whsec_proto_default";
-
 /**
- * Generate HMAC-SHA256 signature for webhook payload.
- * The receiving system can verify authenticity using the same secret.
- */
-function signPayload(payload) {
-  return crypto
-    .createHmac("sha256", WEBHOOK_SECRET)
-    .update(JSON.stringify(payload))
-    .digest("hex");
-}
-
-/**
- * Send a signed webhook POST to the given URL.
+ * Send a webhook POST to the given URL.
  */
 async function sendWebhook(url, payload) {
-  const signature = signPayload(payload);
-
   console.log(`🔔 Sending webhook to ${url}`);
 
   const response = await fetch(url, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
-      "X-Webhook-Signature": `sha256=${signature}`,
     },
     body: JSON.stringify(payload),
   });

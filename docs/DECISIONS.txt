@@ -57,33 +57,20 @@
               but realistic enough for demonstration.
 
 
-4. WEBHOOK SIGNING: HMAC-SHA256
-───────────────────────────────────────────────────────────────────────────────
-
-  Decision:   Sign all webhook payloads with HMAC-SHA256 using a shared secret.
-              The signature is sent in the X-Webhook-Signature header.
-
-  Why:        - Industry standard (used by Stripe, GitHub, etc.)
-              - Receiving systems can verify the webhook came from our API
-              - Prevents injection of fake status updates
-              - Simple to implement with Node.js crypto module
-              - No external dependencies
-
-
-5. STATUS LIFECYCLE SIMULATION
+44. STATUS LIFECYCLE SIMULATION
 ───────────────────────────────────────────────────────────────────────────────
 
   Decision:   Simulate the full execution lifecycle via timed transitions:
               initialized → in_progress (2s) → completed (5s)
 
   Why:        - Demonstrates realistic protocol behavior
-              - Each transition fires a separate signed webhook event
+              - Each transition fires a separate webhook event
               - External tools can react to intermediate states
               - "rejected" status exists as a concept but is not simulated
                 in this prototype (future consideration)
 
 
-6. NO ORM
+5. NO ORM
 ───────────────────────────────────────────────────────────────────────────────
 
   Decision:   Use raw SQL via pg (node-postgres), no ORM.
@@ -95,7 +82,7 @@
               - Avoids introducing Sequelize/Prisma complexity
 
 
-7. VERSIONED ROUTES
+6. VERSIONED ROUTES
 ───────────────────────────────────────────────────────────────────────────────
 
   Decision:   All API routes are under /api/v1/
@@ -105,7 +92,7 @@
               - Industry standard practice
 
 
-8. SELF-HOSTED INFRASTRUCTURE
+7. SELF-HOSTED INFRASTRUCTURE
 ───────────────────────────────────────────────────────────────────────────────
 
   Decision:   Docker Compose for PostgreSQL, Node.js for the API server.

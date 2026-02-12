@@ -61,7 +61,7 @@ WHAT WORKS
   - API key validation with tenant derivation
   - Protocol execution creation with 201 response
   - Status lifecycle simulation (initialized → in_progress → completed)
-  - Signed webhook events (HMAC-SHA256)
+  - Webhook event delivery (raw JSON)
   - Built-in webhook receiver for testing
   - HTML test UI at /index.html
   - Docker-based PostgreSQL with auto-table creation
@@ -71,6 +71,7 @@ WHAT DOES NOT WORK / IS INCOMPLETE
 ───────────────────────────────────────────────────────────────────────────────
 
   - No real Reportheld integration (everything is simulated)
+  - No webhook signing (removed for simplicity)
   - No webhook retry on failure
   - No "rejected" status simulation
   - No rate limiting

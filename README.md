@@ -84,8 +84,6 @@ After the request, the server simulates:
 - **2 seconds** → status changes to `in_progress` (webhook sent)
 - **5 seconds** → status changes to `completed` (webhook sent)
 
-Each webhook includes an `X-Webhook-Signature` header (HMAC-SHA256).
-
 ## API Keys
 
 | Key                    | Tenant       |

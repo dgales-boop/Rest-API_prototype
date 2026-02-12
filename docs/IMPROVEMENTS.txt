@@ -19,7 +19,14 @@ PRIORITY: HIGH (Should be in v2)
       Effort: Medium (add token issuance endpoint, verify middleware)
       Note:   Keep API key support for backward compatibility
 
-  2.  Webhook Retry with Exponential Backoff
+  2.  Webhook Signing (HMAC-SHA256)
+      ─────────────────────────────────────────────────────────────────
+      What:   Sign webhook payloads with a shared secret
+      Why:    Allows receivers to verify the message came from us
+      Effort: Low (Node.js crypto module)
+      Note:   Critical for security before production use
+
+  3.  Webhook Retry with Exponential Backoff
       ─────────────────────────────────────────────────────────────────
       What:   Retry failed webhook deliveries up to N times with delay
       Why:    Webhook receivers may be temporarily down

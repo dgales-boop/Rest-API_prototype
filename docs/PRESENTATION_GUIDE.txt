@@ -133,8 +133,8 @@ STRUCTURE OVERVIEW
   external system is listening."
 
   Step 5 — Show the terminal/server logs (if screen sharing allows)
-  "You can see in the server logs: the webhook was signed with
-  HMAC-SHA256 and delivered with a 200 status."
+  "You can see in the server logs: the webhook was delivered
+  with a 200 status."
 
   IF THE DEMO BREAKS:
   ──────────────────────
@@ -158,11 +158,7 @@ STRUCTURE OVERVIEW
   2. Tenant Isolation — the tenant is derived from the key on the
      server side. A client can never claim to be a different tenant.
 
-  3. Webhook Signing — every webhook we send is signed with
-     HMAC-SHA256. The receiving system can verify the signature to
-     make sure it actually came from our API and wasn't spoofed.
-
-  4. Minimal Exposure — we only expose one action. No reads, no
+  3. Minimal Exposure — we only expose one action. No reads, no
      deletes, no admin operations. You can start a protocol, and
      you can receive status updates. That's it."
 
@@ -227,38 +223,178 @@ STRUCTURE OVERVIEW
 
 
 ===============================================================================
-  COMMON QUESTIONS AND HOW TO ANSWER THEM
+  POSSIBLE QUESTIONS AND HOW TO ANSWER THEM
 ===============================================================================
 
-  Q: "Why PostgreSQL and not MongoDB?"
-  A: "Protocol executions have a clear, structured schema — IDs,
-     statuses, timestamps, tenant references. PostgreSQL's relational
-     model and ACID guarantees are a better fit for this kind of
-     structured data. MongoDB is great for flexible documents, but
-     we didn't need that flexibility here."
+  Read these with your partner. Decide who answers which topic.
+  You don't need to memorize these word-for-word — just understand
+  the idea so you can explain it naturally.
 
-  Q: "What happens if the webhook fails?"
-  A: "Right now, it logs the error and moves on. There's no retry.
-     We documented this as a known limitation and proposed retry with
-     exponential backoff as a v2 improvement."
-
-  Q: "Is this production-ready?"
-  A: "No — and it's not meant to be. It's a prototype that proves
-     the concept works. For production, we'd need JWT auth, rate
-     limiting, webhook retries, automated tests, and actual Reportheld
-     integration. All of those are in our improvements roadmap."
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT THE ENDPOINT
+───────────────────────────────────────────────────────────────────────────────
 
   Q: "Why only one endpoint?"
   A: "The charter said to expose 'the right things, not everything.'
      Protocol execution is the single highest-value capability for
      external automation. One solid endpoint is better than five
-     half-finished ones."
+     half-finished ones. We documented what should come next
+     in our improvements file."
+
+  Q: "Why POST and not GET?"
+  A: "Because we're creating something — a protocol execution.
+     POST is the correct HTTP method for creating a new resource.
+     GET is for reading data, which we don't expose yet."
+
+  Q: "Why /api/v1/ in the URL?"
+  A: "Versioning. If we need to change the API later — like changing
+     the response format — we can create /api/v2/ without breaking
+     existing integrations that still use v1. It's standard practice."
+
+
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT SECURITY
+───────────────────────────────────────────────────────────────────────────────
 
   Q: "How does tenant isolation actually work?"
-  A: "Each API key maps to exactly one tenant ID. When a request comes
-     in, the server looks up the key, finds the tenant, and attaches it
-     to the execution record. The tenant is never provided by the client,
-     so there's no way to impersonate another tenant."
+  A: "Each API key maps to exactly one tenant. When a request comes in,
+     the server looks up the key, finds the tenant, and attaches it
+     to the execution record. The tenant is never provided by the
+     client, so there's no way to impersonate another tenant."
+
+  Q: "Why not JWT instead of API keys?"
+  A: "JWT is the right move for production — it gives us token expiry,
+     refresh, and scoped permissions. But for a prototype, static
+     API keys are simpler and still demonstrate the tenant isolation
+     model. JWT is in our v2 roadmap."
+
+  Q: "What if someone steals the API key?"
+  A: "That's a real concern. In production, we'd add rate limiting,
+     IP allowlisting, and key rotation. For this prototype, the keys
+     are only used locally. We documented these improvements for v2."
+
+  Q: "Is this secure enough for production?"
+  A: "No — and we intentionally documented what's missing. For
+     production we'd need webhook signing, JWT, rate limiting, and
+     HTTPS. The prototype shows the core model works — production
+     hardens it."
+
+
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT TECHNICAL CHOICES
+───────────────────────────────────────────────────────────────────────────────
+
+  Q: "Why PostgreSQL and not MongoDB?"
+  A: "Protocol executions have a clear, structured schema — IDs,
+     statuses, timestamps, tenant references. PostgreSQL's relational
+     model and ACID guarantees are a better fit. MongoDB is great
+     for flexible documents, but we didn't need that flexibility."
+
+  Q: "What is ACID?"
+  A: "It stands for Atomicity, Consistency, Isolation, Durability.
+     It basically means when we update a status from 'in_progress'
+     to 'completed', it either fully happens or doesn't happen at
+     all — no half-updates. That's important for reliable status
+     tracking."
+
+  Q: "Why no ORM like Sequelize or Prisma?"
+  A: "We wanted minimal dependencies and full control over our SQL
+     queries. For a small prototype with two queries, raw SQL is
+     simpler and easier to understand. An ORM adds complexity
+     that isn't justified at this scale."
+
+  Q: "Why Express and not Fastify or another framework?"
+  A: "Express is the most widely used Node.js framework. It's
+     well-documented, easy to understand, and any developer can
+     pick it up quickly. For a prototype focused on clarity,
+     it's the right choice."
+
+  Q: "What does Docker do here?"
+  A: "Docker runs our PostgreSQL database in a container. This means
+     any developer can start the database with one command —
+     docker compose up — without installing PostgreSQL on their
+     machine. It makes the project truly portable."
+
+
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT THE STATUS LIFECYCLE
+───────────────────────────────────────────────────────────────────────────────
+
+  Q: "Why do you simulate the status changes? Why not make them real?"
+  A: "Because we're not modifying Reportheld. In a real integration,
+     Reportheld itself would change the status as it processes the
+     protocol. Our simulation proves the webhook mechanism works —
+     the real status changes would come from Reportheld's engine."
+
+  Q: "What about the 'rejected' status in your slides?"
+  A: "It exists as a concept in our design — a protocol execution
+     could fail or be rejected. We didn't simulate it in the
+     prototype because the happy path was enough to prove the
+     concept. Adding rejected would be straightforward."
+
+
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT WEBHOOKS
+───────────────────────────────────────────────────────────────────────────────
+
+  Q: "What is a webhook?"
+  A: "Instead of the external tool constantly asking 'is it done yet?'
+     — which is called polling — our API pushes a notification to
+     the external tool when something changes. It's like the
+     difference between refreshing your email vs getting a push
+     notification. More efficient, more real-time."
+
+  Q: "What happens if the webhook fails?"
+  A: "Right now, it logs the error and moves on. There's no retry.
+     We documented this as a known limitation. In v2, we'd add
+     retry with exponential backoff — try again after 1 second,
+     then 2, then 4, then 8, and so on."
+
+  Q: "How do you secure webhooks?"
+  A: "Security-wise, we derived tenant ID from the API key so data is
+     isolated. For message integrity, you would normally sign webhooks
+     using HMAC-SHA256. We left that out of the V1 prototype to keep
+     the code simple, but it is the FIRST thing we would add for V2.
+     It's documented in our Improvements file."
+
+
+───────────────────────────────────────────────────────────────────────────────
+  ABOUT HANDOVER & NEXT STEPS
+───────────────────────────────────────────────────────────────────────────────
+
+  Q: "Can the next team actually continue this?"
+  A: "Yes. We wrote the README so they can run it in under 5 minutes.
+     And we have five documentation files covering our decisions,
+     assumptions, open questions, what we excluded, and what should
+     be built next."
+
+  Q: "What should the next team focus on?"
+  A: "The biggest gap is real Reportheld integration — right now
+     everything is simulated. After that, webhook signing and
+     retries are the highest-priority improvements."
+
+  Q: "What would you do differently if you started over?"
+  A: "Honestly, not much for the scope we had. If we had more time,
+     we'd add a GET endpoint for checking execution status and
+     automated tests. But for a Week 1 prototype, we're happy
+     with the focus on one solid endpoint with proper documentation."
+───────────────────────────────────────────────────────────────────────────────
+  IF YOU DON'T KNOW THE ANSWER
+───────────────────────────────────────────────────────────────────────────────
+
+  It's okay. Here are professional responses:
+
+  "That's a good question. We haven't explored that yet, but we
+  documented it as an open question for the next team."
+
+  "We considered that but decided to keep it out of v1 to focus
+  on proving the core concept first."
+
+  "That's something we'd need to investigate further — it's a
+  good candidate for the v2 scope."
+
+  NEVER make up an answer. Saying "I don't know but here's how
+  I'd find out" is always better than guessing.
 
 
 ===============================================================================
@@ -284,7 +420,12 @@ STRUCTURE OVERVIEW
      Reportheld is feasible. The next team can pick it up and build
      on it immediately."
 
+  6. Speak with confidence. You built this. You understand why every
+     piece exists. You're not presenting homework — you're presenting
+     a professional prototype.
+
 
 ===============================================================================
   END OF PRESENTATION GUIDE
 ===============================================================================
+
