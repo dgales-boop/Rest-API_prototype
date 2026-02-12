@@ -1,0 +1,290 @@
+===============================================================================
+  PRESENTATION & DEMO GUIDE
+  Reportheld REST API — OJT Week 1 Deliverable
+===============================================================================
+
+  Use this guide to prepare for your meeting.
+  Read it with your partner and decide who presents which section.
+
+  Estimated presentation time: 10–15 minutes
+  (including live demo)
+
+===============================================================================
+
+
+STRUCTURE OVERVIEW
+───────────────────────────────────────────────────────────────────────────────
+
+  1. The Problem           (1–2 min)  — Why this API exists
+  2. Our Decision          (2–3 min)  — What we chose to expose and why
+  3. Live Demo             (3–4 min)  — Show it working
+  4. Security & Boundaries (2 min)    — What we protected
+  5. What We Excluded      (1–2 min)  — What we intentionally did NOT build
+  6. Handover & Next Steps (1–2 min)  — How the next team continues
+
+  TIP: Split it. One person explains the concept (sections 1, 2, 4, 5).
+       The other person drives the live demo and talks through the code
+       (sections 3, 6).
+
+
+===============================================================================
+  SECTION 1: THE PROBLEM (1–2 min)
+===============================================================================
+
+  WHAT TO SAY:
+  ──────────────
+
+  "Reportheld is an internal system. Right now, there's no way for
+  external tools — like n8n, or an AI agent — to interact with it
+  securely.
+
+  If someone wants to start a protocol execution, they have to do it
+  manually inside Reportheld. There's no automation, no external
+  integration, and no real-time updates.
+
+  Our task was: can we build a secure bridge that lets external
+  systems trigger meaningful actions in Reportheld, without breaking
+  security or exposing internal data?"
+
+  KEY POINT TO LAND:
+  ──────────────
+  The API is NOT about exposing the database. It's about exposing
+  a meaningful domain action — safely.
+
+
+===============================================================================
+  SECTION 2: OUR DECISION (2–3 min)
+===============================================================================
+
+  WHAT TO SAY:
+  ──────────────
+
+  "We chose to expose one endpoint:
+
+     POST /api/v1/protocol-executions
+
+  This lets an external system say: 'Start this protocol at this site.'
+  That's it. One action, one endpoint.
+
+  We chose this because protocol execution is the highest-value
+  capability for automation. An n8n workflow can trigger an inspection.
+  An AI agent can request a safety check. And they get real-time updates
+  back through webhooks — no polling needed.
+
+  We did NOT expose protocol creation, template editing, user management,
+  or any raw database access. Those are internal operations that would
+  increase the attack surface without clear value for external consumers."
+
+  KEY POINT TO LAND:
+  ──────────────
+  This is a domain-driven API, not a CRUD API. We expose what's
+  valuable, not what's technically possible.
+
+  IF THEY ASK "Why only one endpoint?":
+  ──────────────
+  "The charter said 'reduce uncertainty.' One well-designed endpoint
+  that proves the concept is more valuable than five half-baked ones.
+  We can always add more in v2 — and we documented exactly what
+  should come next in our improvements doc."
+
+
+===============================================================================
+  SECTION 3: LIVE DEMO (3–4 min)
+===============================================================================
+
+  BEFORE THE MEETING — PREPARATION CHECKLIST:
+  ──────────────────────────────────────────────
+
+  [ ] Docker Desktop is running
+  [ ] Run: docker compose -f data/docker-compose.yml up -d
+  [ ] Run: npm start
+  [ ] Verify http://localhost:4001 loads in your browser
+  [ ] Do one test click to make sure everything works
+  [ ] Have a terminal ready to show server logs side-by-side
+
+  DEMO FLOW (talk as you do each step):
+  ──────────────────────────────────────
+
+  Step 1 — Show the Test UI
+  "This is our test page. It's a simple form where you provide
+  an API key, a protocol ID, a site ID, and a webhook URL."
+
+  Step 2 — Point out the API key field
+  "Notice the API key — rh_test_alpha_92f4c1. This key maps to
+  tenant-alpha on the server side. The tenant is never provided
+  by the client. The server derives it from the key. This is how
+  we enforce tenant isolation."
+
+  Step 3 — Click 'Execute Protocol'
+  "When I click this, it sends a POST request to our API.
+  The server validates the key, creates an execution record in
+  PostgreSQL, and returns a 201 response with the execution ID
+  and status 'initialized'."
+
+  (Point to the API Response panel — show the JSON)
+
+  Step 4 — Wait for webhooks
+  "Now watch the Webhook Events panel. In about 2 seconds...
+  there — the status changed to 'in_progress'. And in a few
+  more seconds... 'completed'.
+
+  Each of these is a webhook POST that our server sent to the
+  webhook URL. In a real setup, this would go to n8n or whatever
+  external system is listening."
+
+  Step 5 — Show the terminal/server logs (if screen sharing allows)
+  "You can see in the server logs: the webhook was signed with
+  HMAC-SHA256 and delivered with a 200 status."
+
+  IF THE DEMO BREAKS:
+  ──────────────────────
+  Stay calm. Say: "Let me check the server logs." Most likely
+  causes: Docker not running, or port 4001 is already in use.
+  If it truly fails, show the curl example from the README instead.
+
+
+===============================================================================
+  SECTION 4: SECURITY & BOUNDARIES (2 min)
+===============================================================================
+
+  WHAT TO SAY:
+  ──────────────
+
+  "Security was a core constraint. Here's what we did:
+
+  1. API Key Authentication — every request needs a valid key in
+     the X-API-Key header, or it gets a 401.
+
+  2. Tenant Isolation — the tenant is derived from the key on the
+     server side. A client can never claim to be a different tenant.
+
+  3. Webhook Signing — every webhook we send is signed with
+     HMAC-SHA256. The receiving system can verify the signature to
+     make sure it actually came from our API and wasn't spoofed.
+
+  4. Minimal Exposure — we only expose one action. No reads, no
+     deletes, no admin operations. You can start a protocol, and
+     you can receive status updates. That's it."
+
+  IF THEY ASK "Why not JWT?":
+  ──────────────
+  "JWT is the right move for production — it gives us token expiry,
+  refresh, and scoped permissions. But for a prototype proving the
+  concept, static API keys are simpler and still demonstrate the
+  tenant isolation model. JWT is in our v2 roadmap."
+
+
+===============================================================================
+  SECTION 5: WHAT WE EXCLUDED (1–2 min)
+===============================================================================
+
+  WHAT TO SAY:
+  ──────────────
+
+  "We documented everything we intentionally left out. The key ones:
+
+  - No protocol creation or editing (internal operations)
+  - No user management (security risk)
+  - No raw database access (we're not building a database mirror)
+  - No GET endpoints for now (webhooks already deliver status)
+
+  Everything is in our EXCLUDED.txt file with reasoning for each."
+
+  KEY POINT TO LAND:
+  ──────────────
+  Saying "we chose NOT to build X because Y" shows stronger
+  judgment than building everything without thinking.
+
+
+===============================================================================
+  SECTION 6: HANDOVER & NEXT STEPS (1–2 min)
+===============================================================================
+
+  WHAT TO SAY:
+  ──────────────
+
+  "We built this to be handed over. The next team can run the
+  prototype in under 5 minutes — it's Docker-based, self-hosted,
+  no cloud dependencies.
+
+  We left five documentation files:
+  - Decision log — every choice and why
+  - Handover notes — assumptions, open questions, honest issues
+  - Domain explanation — what this represents in Reportheld
+  - Excluded list — what we didn't build and why
+  - Improvements — 15 prioritized items for future versions
+
+  The biggest open question for the next team: how does this
+  API actually connect to Reportheld's real backend? Right now
+  everything is simulated. The architecture is ready, but the
+  integration point needs to be defined."
+
+  KEY POINT TO LAND:
+  ──────────────
+  "Our work survives us. Another team can pick this up and
+  continue within 30 minutes — which is exactly what the
+  charter asked for."
+
+
+===============================================================================
+  COMMON QUESTIONS AND HOW TO ANSWER THEM
+===============================================================================
+
+  Q: "Why PostgreSQL and not MongoDB?"
+  A: "Protocol executions have a clear, structured schema — IDs,
+     statuses, timestamps, tenant references. PostgreSQL's relational
+     model and ACID guarantees are a better fit for this kind of
+     structured data. MongoDB is great for flexible documents, but
+     we didn't need that flexibility here."
+
+  Q: "What happens if the webhook fails?"
+  A: "Right now, it logs the error and moves on. There's no retry.
+     We documented this as a known limitation and proposed retry with
+     exponential backoff as a v2 improvement."
+
+  Q: "Is this production-ready?"
+  A: "No — and it's not meant to be. It's a prototype that proves
+     the concept works. For production, we'd need JWT auth, rate
+     limiting, webhook retries, automated tests, and actual Reportheld
+     integration. All of those are in our improvements roadmap."
+
+  Q: "Why only one endpoint?"
+  A: "The charter said to expose 'the right things, not everything.'
+     Protocol execution is the single highest-value capability for
+     external automation. One solid endpoint is better than five
+     half-finished ones."
+
+  Q: "How does tenant isolation actually work?"
+  A: "Each API key maps to exactly one tenant ID. When a request comes
+     in, the server looks up the key, finds the tenant, and attaches it
+     to the execution record. The tenant is never provided by the client,
+     so there's no way to impersonate another tenant."
+
+
+===============================================================================
+  FINAL TIPS
+===============================================================================
+
+  1. Practice the demo once before the meeting. Make sure Docker is
+     running and the server starts cleanly.
+
+  2. Don't read from slides. Tell the story:
+     Problem → Decision → Proof (demo) → Security → What's next
+
+  3. When you show code or config, point out the WHY, not the WHAT.
+     Don't say "this line creates a pool." Say "we connect to PostgreSQL
+     here because structured execution records need ACID guarantees."
+
+  4. If someone asks something you don't know, say: "That's a great
+     question. We documented it as an open question in our handover
+     notes for the next team." This is honest and professional.
+
+  5. End strong. Your last sentence should be something like:
+     "This prototype proves that a secure, self-hosted REST API for
+     Reportheld is feasible. The next team can pick it up and build
+     on it immediately."
+
+
+===============================================================================
+  END OF PRESENTATION GUIDE
+===============================================================================
