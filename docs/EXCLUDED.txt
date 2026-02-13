@@ -1,10 +1,25 @@
 EXCLUDED FROM V1 — What we didn’t build (on purpose)
 
-- Protocol/template create or edit — internal domain; risky to expose.
-- User/group management — admin only; security risk.
-- Generic CRUD / raw DB — API is domain actions, not a DB mirror.
-- GET execution status — webhooks cover updates; GET can come in v2.
-- Webhook retry / delivery guarantees — extra complexity; v2.
-- Rate limiting — not needed for prototype; v2.
-- Automated tests — manual curl/UI for now; add before production.
-- JWT — API keys enough for prototype; JWT in v2.
+Protocol or template create/edit
+We only expose "execute a protocol". Creating or editing protocols/templates is internal domain; exposing it would risk data corruption and isn’t needed for automation.
+
+User and group management
+Admin-only; high security risk. Belongs in Reportheld’s own UI, not in this API.
+
+Generic CRUD / raw database exposure
+The API is a product surface (domain actions), not a mirror of the database. We avoided GET/PUT/DELETE on generic resources to keep boundaries clear and reduce coupling.
+
+GET execution status
+Status updates go out via webhooks. We didn’t add a GET-by-id endpoint to avoid encouraging polling; it can be added in v2 as a fallback or for dashboards.
+
+Webhook retry and delivery guarantees
+Would need queues, retries, dead-letter handling. Left for v2; prototype is best-effort delivery.
+
+Rate limiting
+Not needed for a prototype with a couple of test keys. Important for production; see IMPROVEMENTS.txt.
+
+Automated tests
+We relied on manual curl and the test UI. A proper test suite should be added before production.
+
+JWT / token-based auth
+Static API keys are enough for the prototype. JWT (expiry, refresh, scopes) is planned for v2.

@@ -1,23 +1,23 @@
 IMPROVEMENTS — For next versions
 
-High (v2)
-- JWT (optional) + keep API keys.
-- Webhook signing (HMAC).
-- Webhook retry + backoff.
-- GET /api/v1/protocol-executions/:id.
-- Rate limiting (e.g. per key).
-- Request/response logging (audit).
+High priority (v2)
+- JWT authentication: optional tokens with expiry/refresh; keep API key support for backward compatibility.
+- Webhook signing (e.g. HMAC-SHA256) so receivers can verify payloads.
+- Webhook retry with exponential backoff; consider a queue or retry table.
+- GET /api/v1/protocol-executions/:id so consumers can check status (fallback for missed webhooks, dashboards).
+- Rate limiting per API key (e.g. express-rate-limit).
+- Request/response or audit logging (e.g. morgan or custom logger).
 
-Medium (v2/v3)
-- OpenAPI/Swagger.
-- Scopes per API key.
-- Webhook URL per tenant (in DB).
-- DB migrations (no inline CREATE TABLE).
-- Automated tests (e.g. Jest + supertest).
+Medium priority (v2 or v3)
+- OpenAPI/Swagger so the API is self-documenting.
+- Scopes per API key (e.g. execute:protocols, read:status).
+- Webhook URL registration per tenant in the DB instead of per-request.
+- Database migrations (e.g. node-pg-migrate) instead of CREATE TABLE in code.
+- Automated test suite (e.g. Jest + supertest) for regression safety.
 
-Low (v3+)
-- Pagination for list endpoint.
-- GET /health.
-- Simulate "rejected" status.
-- Dockerfile for API (full stack in compose).
-- MCP layer for AI agents.
+Low priority (v3+)
+- Pagination for a list endpoint (e.g. GET executions with cursor).
+- GET /health for monitoring and load balancers.
+- Simulate "rejected" status for testing failure paths.
+- Dockerfile for the API so one docker-compose up runs the full stack.
+- MCP layer so AI agents can call the API as a tool.

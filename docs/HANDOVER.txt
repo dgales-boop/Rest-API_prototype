@@ -1,23 +1,46 @@
 HANDOVER — Start here (next team)
 
 What this is
-- REST API: create a "protocol execution" (start a protocol at a site). API key auth, Postgres, webhooks for status updates. No real Reportheld backend yet — status changes are simulated.
+A self-hosted REST API that lets external tools (n8n, scripts, etc.) create a "protocol execution" — i.e. start a protocol at a given site. It uses API key auth, stores executions in PostgreSQL, and sends status updates to a webhook URL you provide. There is no real Reportheld backend yet: status changes (initialized → in_progress → completed) are simulated with timers.
 
-Run it (~5 min)
-- Node 18+, Docker running.
+How to run it (~5 min)
+Prerequisites: Node.js 18+, Docker Desktop running.
+
   1. cp .env.example .env
   2. docker compose -f data/docker-compose.yml up -d
   3. npm install && npm start
-  4. Open http://localhost:4001
+  4. Open http://localhost:4001 (test UI and API)
 
 What works
-- API key validation, tenant from key, POST creates execution (201), simulated lifecycle (init → in_progress → completed), webhooks to given URL, built-in /webhook-receiver and /webhook-events for testing, test UI at /index.html, Postgres + auto table creation.
+- API key validation: X-API-Key header, tenant derived from key.
+- POST /api/v1/protocol-executions creates an execution and returns 201.
+- Simulated lifecycle: initialized, then in_progress after 2s, then completed after 5s.
+- Webhooks: each status change is POSTed to the URL you send in the body.
+- Built-in /webhook-receiver and GET /webhook-events for testing (used by the test UI).
+- Test UI at /index.html to trigger an execution and see webhook events.
+- PostgreSQL with auto-creation of the protocol_executions table on startup.
 
 What’s missing / not done
-- No real Reportheld integration (simulated only). No webhook signing/retry, no "rejected" status, no rate limit, no audit log, no API key management API, no tests.
+- No real Reportheld integration (everything is simulated).
+- No webhook signing or retry; delivery is best-effort.
+- No "rejected" status in the simulation.
+- No rate limiting, no request/audit logging.
+- API keys are static in .env (no management API).
+- No automated tests; manual curl and test UI only.
 
 Where things live
-- server.js = entry, routes; db.js = Postgres + init; controllers/ = create execution + webhooks; middleware/ = API key; models/ = SQL; routes/ = mount; public/index.html = test UI; data/docker-compose.yml = Postgres.
+- server.js — Express app, routes, webhook receiver and events.
+- db.js — PostgreSQL connection and table init.
+- controllers/ — createExecution (insert + timers + webhook calls).
+- middleware/ — API key validation, sets req.tenantId.
+- models/ — SQL for create and updateStatus.
+- routes/ — mounts POST / on protocol-executions route.
+- public/index.html — test UI.
+- data/docker-compose.yml — PostgreSQL container.
 
-Open questions for next team
-- How to auth with real Reportheld? Webhook URL per-tenant in DB or per-request? Real status lifecycle (e.g. queued/paused)? GET execution by id or webhook-only? Concurrency/scale expectations?
+Open questions for the next team
+- How will the API authenticate with Reportheld’s real backend? Are there internal APIs to call?
+- Should webhook URLs be stored per tenant in the DB, or always passed per request?
+- What is the real status lifecycle in Reportheld (e.g. queued, paused, rejected)?
+- Do we need GET /api/v1/protocol-executions/:id for status checks, or is webhook-only enough?
+- What are the expected concurrency and scale (e.g. for indexing or design)?
