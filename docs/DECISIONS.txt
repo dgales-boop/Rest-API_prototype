@@ -1,19 +1,26 @@
 DECISION LOG — Why we built it this way
 
 1. Single endpoint: POST /api/v1/protocol-executions
-   We expose one domain action ("start a protocol at a site"), not full CRUD. This keeps the API focused on what external automation needs and avoids exposing internal data structures. We rejected generic CRUD on protocols/templates as too risky and low-value.
+   We expose one domain action ("start a protocol at a site"), not full CRUD. This keeps the API focused on what external 
+   automation needs and avoids exposing internal data structures. We rejected generic CRUD on protocols/templates as 
+   too risky and low-value.
 
 2. PostgreSQL
-   We use PostgreSQL for execution records: relational model fits, ACID helps with status transitions, and we get UUID support for IDs. We use the pg driver with raw SQL and no ORM (Sequelize/Prisma) to keep the prototype simple and easy to follow.
+   We use PostgreSQL for execution records: relational model fits, ACID helps with status transitions, and we get UUID support 
+   for IDs. We use the pg driver with raw SQL and no ORM (Sequelize/Prisma) to keep the prototype simple and easy to follow.
 
 3. API keys in .env (JSON map)
-   Each API key maps to one tenant; the tenant is derived server-side from the key and never taken from the client. Storing keys as a JSON map in .env is enough for the prototype and keeps auth auditable. We can move to JWT later for expiry and scopes.
+   Each API key maps to one tenant; the tenant is derived server-side from the key and never taken from the client. 
+   Storing keys as a JSON map in .env is enough for the prototype and keeps auth auditable. We can move to JWT later for 
+   expiry and scopes.
 
 4. Status lifecycle: initialized → in_progress (2s) → completed (5s)
-   Transitions are simulated with setTimeout. Each transition sends a webhook to the URL the client provided. "rejected" is part of the domain idea but not implemented in this prototype.
+   Transitions are simulated with setTimeout. Each transition sends a webhook to the URL the client provided. 
+   "rejected" is part of the domain idea but not implemented in this prototype.
 
 5. Routes under /api/v1/
    Versioning lets us add v2 later (e.g. /api/v2/...) without breaking existing clients.
 
 6. Self-hosted only
-   PostgreSQL runs via Docker Compose; the API runs on Node. No cloud services. This matches the requirement that any team can run it locally or on-prem.
+   PostgreSQL runs via Docker Compose; the API runs on Node. No cloud services. This matches the requirement that any team 
+   can run it locally or on-prem.

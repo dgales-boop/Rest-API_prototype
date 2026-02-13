@@ -1,16 +1,19 @@
 EXCLUDED FROM V1 — What we didn’t build (on purpose)
 
 Protocol or template create/edit
-We only expose "execute a protocol". Creating or editing protocols/templates is internal domain; exposing it would risk data corruption and isn’t needed for automation.
+We only expose "execute a protocol". Creating or editing protocols/templates is internal domain; 
+exposing it would risk data corruption and isn’t needed for automation.
 
 User and group management
 Admin-only; high security risk. Belongs in Reportheld’s own UI, not in this API.
 
 Generic CRUD / raw database exposure
-The API is a product surface (domain actions), not a mirror of the database. We avoided GET/PUT/DELETE on generic resources to keep boundaries clear and reduce coupling.
+The API is a product surface (domain actions), not a mirror of the database. We avoided GET/PUT/DELETE on generic resources 
+to keep boundaries clear and reduce coupling.
 
 GET execution status
-Status updates go out via webhooks. We didn’t add a GET-by-id endpoint to avoid encouraging polling; it can be added in v2 as a fallback or for dashboards.
+Status updates go out via webhooks. We didn’t add a GET-by-id endpoint to avoid encouraging polling; it can be added in v2 
+as a fallback or for dashboards.
 
 Webhook retry and delivery guarantees
 Would need queues, retries, dead-letter handling. Left for v2; prototype is best-effort delivery.

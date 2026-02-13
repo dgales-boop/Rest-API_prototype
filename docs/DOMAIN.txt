@@ -1,16 +1,23 @@
 DOMAIN — What this API does in Reportheld
 
 What Reportheld is
-Reportheld manages templates, protocols, inspections, and reporting. Most of that logic stays internal. The REST API does not expose templates, user management, or raw data — only one capability that external systems need.
+Reportheld manages templates, protocols, inspections, and reporting. Most of that logic stays internal. 
+The REST API does not expose templates, user management, or raw data — only one capability that external systems need.
 
 What we expose
-One action: "Start a protocol at a site" — POST /api/v1/protocol-executions. It is a clear domain action (not a data query), safe to call from outside (doesn’t change templates), and observable via webhooks when status changes. That makes it useful for n8n, scripts, and future AI agents.
+One action: "Start a protocol at a site" — POST /api/v1/protocol-executions. It is a clear domain action (not a data query), 
+safe to call from outside (doesn’t change templates), and observable via webhooks when status changes. 
+That makes it useful for n8n, scripts, and future AI agents.
 
 Lifecycle (this prototype)
-When you create an execution, status moves: initialized → in_progress (after 2 seconds) → completed (after 5 seconds). Each step triggers a POST to the webhook URL you sent in the request. In production, these transitions would be driven by real Reportheld events, not timers.
+When you create an execution, status moves: initialized → in_progress (after 2 seconds) → completed (after 5 seconds). 
+Each step triggers a POST to the webhook URL you sent in the request. In production, these transitions would be driven by real 
+Reportheld events, not timers.
 
 Who uses it
-Expected consumers: n8n (workflow automation), future AI agents, and possibly dashboards. Authentication is via the X-API-Key header; each key maps to one tenant.
+Expected consumers: n8n (workflow automation), future AI agents, and possibly dashboards. Authentication is via the 
+X-API-Key header; each key maps to one tenant.
 
 Tenant isolation
-Every API key maps to exactly one tenant. The tenant is determined server-side from the key and stored on every execution. A client cannot send or see another tenant’s data; isolation is enforced at the API layer.
+Every API key maps to exactly one tenant. The tenant is determined server-side from the key and stored on every execution. 
+A client cannot send or see another tenant’s data; isolation is enforced at the API layer.
