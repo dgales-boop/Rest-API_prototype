@@ -1,0 +1,41 @@
+TASKS FOR NEXT WEEK — Suggested focus for the next team
+
+Use this as a checklist. Order is flexible; pick what fits your capacity. See HANDOVER.txt for how to run the app and IMPROVEMENTS.txt for the full backlog.
+
+───────────────────────────────────────────────────────────────────────────────
+
+1. GET /api/v1/protocol-executions/:id
+   What: Let callers fetch one execution by ID (e.g. after a missed webhook or for a dashboard).
+   Where: Add a GET route in routes/protocolExecutions.js, a handler in controllers/, and a model method in models/protocolExecution.js (SELECT by id). Enforce tenant: only return the execution if its tenant_id matches the API key’s tenant.
+   Done when: GET with valid API key and existing id returns 200 and the execution; wrong tenant or missing id returns 404.
+
+2. GET /health
+   What: Health endpoint for monitoring and Docker (e.g. healthcheck in compose).
+   Where: server.js — add GET /health that checks the DB (e.g. pool.query('SELECT 1')) and returns 200 if OK, 503 if DB fails.
+   Done when: curl http://localhost:4001/health returns 200 when Postgres is up, and 503 when Postgres is down.
+
+3. Request logging
+   What: Log each API request (method, path, status, maybe API key id or tenant) so you have an audit trail.
+   Where: server.js — add middleware (e.g. morgan or a small custom logger) before your routes. Prefer not logging full API keys; tenant or “anonymous” is enough.
+   Done when: Every request to /api/v1/... and /webhook-receiver is logged to the console (or a file) with enough info to debug.
+
+4. Rate limiting
+   What: Limit requests per API key (or per IP if key missing) to avoid abuse.
+   Where: middleware — add express-rate-limit (or similar). Apply it to the protocol-executions route (or all /api/v1/). Optionally key by req.tenantId or X-API-Key so limits are per tenant.
+   Done when: After N requests in a short window (e.g. 100/min), the next request gets 429 and no execution is created.
+
+5. Webhook signing (HMAC)
+   What: Sign webhook payloads so receivers can verify they came from this API.
+   Where: controllers/protocolExecutionController.js — in sendWebhook, compute HMAC-SHA256 of the JSON body with a secret from .env; add a header (e.g. X-Webhook-Signature). Document the header and algorithm in README or a short docs note.
+   Done when: Each webhook POST includes a signature header; a receiver can verify it using the same secret.
+
+6. A few automated tests
+   What: At least: (a) POST /api/v1/protocol-executions with valid key returns 201 and body has executionId; (b) POST without key returns 401; (c) GET /api/v1/protocol-executions/:id returns the execution for the right tenant and 404 for wrong tenant or missing id.
+   Where: New folder tests/ with Jest + supertest (or similar). Start the server with a test DB or in-memory config so CI can run it.
+   Done when: npm test runs and these cases pass.
+
+───────────────────────────────────────────────────────────────────────────────
+
+If you only have time for a couple of items: 1 (GET by id) and 2 (health) give the most bang for the buck. Add 3–4 for better operability, then 5–6 for security and regression safety.
+
+After the week: update HANDOVER.txt with what you did and move anything you didn’t do into “Open questions” or the next week’s list.
