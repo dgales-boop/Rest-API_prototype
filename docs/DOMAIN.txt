@@ -1,109 +1,18 @@
-===============================================================================
-  DOMAIN EXPLANATION — What This API Represents in Reportheld
-===============================================================================
+DOMAIN — What this API does in Reportheld
 
+What Reportheld is
+- Manages templates, protocols, inspections, reporting. Most of that is internal; we don’t expose it.
 
-THE REPORTHELD CONTEXT
-───────────────────────────────────────────────────────────────────────────────
+What we expose
+- One action: "Start a protocol at a site" → POST /api/v1/protocol-executions
+- Good for automation (n8n, scripts). Safe (doesn’t change templates). Status updates go out via webhooks.
 
-  Reportheld is a domain-rich system used for managing templates,
-  protocols, inspections, and reporting workflows. It handles:
+Lifecycle (this prototype)
+- initialized → in_progress (after 2s) → completed (after 5s). Each step POSTs to the caller’s webhook URL.
+- In production, transitions would come from real Reportheld events.
 
-    - Protocol templates (what to check)
-    - Protocol executions (actually performing the checks)
-    - Items/fields within protocols
-    - Status tracking and history
-    - User and group management
-    - Export and reporting
+Who uses it
+- n8n / automation, future AI agents, future dashboards. Auth: X-API-Key → one tenant per key.
 
-  Most of this logic is internal. The REST API does NOT expose all of it.
-
-
-WHAT WE EXPOSE: PROTOCOL EXECUTION
-───────────────────────────────────────────────────────────────────────────────
-
-  A "protocol execution" represents the act of running a predefined
-  protocol at a specific site. Think of it as:
-
-    "Start the safety inspection protocol at Site 001."
-
-  This is the single most valuable capability for external systems
-  because it is:
-
-    1.  A clear domain action (not a data query)
-    2.  Safe to trigger externally (does not modify templates)
-    3.  Observable via webhooks (status changes flow outward)
-    4.  Useful for automation (n8n, AI agents, scheduled jobs)
-
-
-WHY NOT OTHER CAPABILITIES?
-───────────────────────────────────────────────────────────────────────────────
-
-  We evaluated which Reportheld capabilities to expose:
-
-    Protocol execution    → YES  (high value, safe, automatable)
-    Protocol templates    → NO   (internal structure, risky to expose)
-    User management       → NO   (admin operation, security risk)
-    Report export         → MAYBE (future v2, read-only, lower risk)
-    Item-level editing    → NO   (too granular, breaks domain boundary)
-
-  The API is a "product surface" — it exposes what is valuable and safe,
-  not what is technically possible.
-
-
-THE EXECUTION LIFECYCLE
-───────────────────────────────────────────────────────────────────────────────
-
-  When a protocol execution is created, it follows this lifecycle:
-
-    ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-    │ initialized  │────→│ in_progress  │────→│  completed   │
-    └──────────────┘     └──────────────┘     └──────────────┘
-                                                     │
-                                               (or rejected)
-
-  Each transition generates a webhook event sent to the subscriber.
-
-  In this prototype, the transitions are simulated with timers:
-    - initialized → in_progress   after 2 seconds
-    - in_progress → completed     after 5 seconds
-
-  In production, these transitions would be driven by actual Reportheld
-  domain events.
-
-
-WHO CONSUMES THIS API?
-───────────────────────────────────────────────────────────────────────────────
-
-  Primary consumers:
-
-    1.  n8n (workflow automation)
-        - Trigger protocol executions on schedule or external event
-        - React to webhook status updates to continue workflows
-
-    2.  AI agents (via MCP layer, future)
-        - Request protocol execution as a "tool call"
-        - Monitor status via webhook events
-
-    3.  Internal dashboards (future)
-        - Display active/completed executions
-        - Would use a read-only GET endpoint (not yet built)
-
-
-TENANT ISOLATION
-───────────────────────────────────────────────────────────────────────────────
-
-  Every API key maps to exactly one tenant. The tenant ID is:
-
-    - Derived server-side from the API key (never trusted from the client)
-    - Stored with every execution record
-    - Used to scope queries (future: ensure tenants only see their data)
-
-  This means an external system using "rh_test_alpha_92f4c1" can only
-  create executions under "tenant-alpha". It cannot access or affect
-  any other tenant's data.
-
-
-===============================================================================
-  END OF DOMAIN EXPLANATION
-===============================================================================
+Tenant
+- Every API key maps to one tenant. Tenant is read from the key (server-side only), stored on each execution. No cross-tenant access.

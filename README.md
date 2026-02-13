@@ -20,7 +20,7 @@ PostgreSQL (Docker, port 5432)
 ## Prerequisites
 
 - **Node.js** 18+
-- **Docker Desktop** — must be installed and **running**
+- **Docker Desktop** — must be installed and **running**. If you see *"client version 1.41 is too old. Minimum supported API version is 1.44"*, upgrade Docker Desktop to the latest version (e.g. [docker.com](https://www.docker.com/products/docker-desktop/) or `winget upgrade Docker.DockerDesktop`), then restart Docker and your terminal.
 
 ## Quick Start
 
