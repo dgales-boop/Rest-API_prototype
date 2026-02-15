@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Protocol Execution — API Tester</title>
+    <title>Execution Protocol API — Interactive Tester</title>
     <style>
       /* ─── Reset & Base ─────────────────────────────── */
       *,
@@ -23,14 +23,12 @@
         background: #0f1117;
         color: #e1e4ea;
         min-height: 100vh;
-        display: flex;
-        justify-content: center;
         padding: 2rem 1rem;
       }
 
       .container {
-        max-width: 720px;
-        width: 100%;
+        max-width: 1000px;
+        margin: 0 auto;
       }
 
       /* ─── Header ───────────────────────────────────── */
@@ -40,7 +38,7 @@
       }
 
       header h1 {
-        font-size: 1.6rem;
+        font-size: 1.8rem;
         font-weight: 700;
         background: linear-gradient(135deg, #6ee7b7, #3b82f6);
         -webkit-background-clip: text;
@@ -50,8 +48,19 @@
 
       header p {
         color: #6b7280;
-        font-size: 0.85rem;
-        margin-top: 0.35rem;
+        font-size: 0.9rem;
+        margin-top: 0.5rem;
+      }
+
+      .badge {
+        display: inline-block;
+        background: #1e3a5f;
+        color: #60a5fa;
+        padding: 0.25rem 0.6rem;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 600;
+        margin-left: 0.5rem;
       }
 
       /* ─── Card ─────────────────────────────────────── */
@@ -70,51 +79,57 @@
         letter-spacing: 1px;
         color: #9ca3af;
         margin-bottom: 1rem;
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      /* ─── Tab Navigation ───────────────────────────── */
+      .tabs {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1.5rem;
+        flex-wrap: wrap;
+      }
+
+      .tab {
+        padding: 0.6rem 1rem;
+        background: #1a1d27;
+        border: 1px solid #2a2d3a;
+        border-radius: 8px;
+        color: #9ca3af;
+        font-size: 0.85rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .tab:hover {
+        border-color: #3b82f6;
+        color: #e1e4ea;
+      }
+
+      .tab.active {
+        background: linear-gradient(135deg, #3b82f6, #6366f1);
+        border-color: transparent;
+        color: #fff;
+      }
+
+      .tab .method {
+        font-weight: 700;
+        margin-right: 0.5rem;
       }
 
       /* ─── Form ─────────────────────────────────────── */
-      .form-group {
+      .form-row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1rem;
         margin-bottom: 1rem;
       }
 
-      /* Endpoint Hero Section */
-      .endpoint-hero {
-        background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%);
-        padding: 2rem;
-        border-radius: 12px;
-        margin-bottom: 2rem;
-        text-align: center;
-        border: 1px solid #4a5568;
-        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
-      }
-
-      .endpoint-hero .method {
-        background-color: #48bb78;
-        color: #fff;
-        padding: 0.25rem 0.75rem;
-        border-radius: 6px;
-        font-weight: bold;
-        font-size: 1.25rem;
-        vertical-align: middle;
-        margin-right: 0.75rem;
-      }
-
-      .endpoint-hero .url {
-        color: #e2e8f0;
-        font-family: "Fira Code", monospace;
-        font-size: 1.5rem;
-        font-weight: 600;
-        vertical-align: middle;
-      }
-
-      .endpoint-hero .description {
-        margin-top: 0.75rem;
-        color: #a0aec0;
-        font-size: 0.95rem;
-      }
-
-      .grid {
-        display: grid;
+      .form-group {
+        margin-bottom: 0.75rem;
       }
 
       label {
@@ -125,7 +140,8 @@
         margin-bottom: 0.3rem;
       }
 
-      input {
+      input,
+      select {
         width: 100%;
         padding: 0.6rem 0.75rem;
         background: #0f1117;
@@ -136,15 +152,15 @@
         transition: border-color 0.2s;
       }
 
-      input:focus {
+      input:focus,
+      select:focus {
         outline: none;
         border-color: #3b82f6;
         box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
       }
 
       button {
-        width: 100%;
-        padding: 0.7rem;
+        padding: 0.7rem 1.5rem;
         background: linear-gradient(135deg, #3b82f6, #6366f1);
         color: #fff;
         border: none;
@@ -168,19 +184,23 @@
         cursor: not-allowed;
       }
 
+      .btn-secondary {
+        background: #2a2d3a;
+      }
+
       /* ─── Output Panels ────────────────────────────── */
       .output {
         background: #0f1117;
         border: 1px solid #2a2d3a;
         border-radius: 8px;
         padding: 1rem;
-        min-height: 80px;
+        min-height: 120px;
         font-family: "Cascadia Code", "Fira Code", monospace;
         font-size: 0.8rem;
         white-space: pre-wrap;
         word-break: break-word;
         overflow-y: auto;
-        max-height: 300px;
+        max-height: 400px;
       }
 
       .output.empty {
@@ -215,6 +235,67 @@
         color: #fde68a;
       }
 
+      /* ─── Protocol List ────────────────────────────── */
+      .protocol-list {
+        display: grid;
+        gap: 0.75rem;
+        margin-top: 1rem;
+      }
+
+      .protocol-item {
+        background: #0f1117;
+        border: 1px solid #2a2d3a;
+        border-radius: 8px;
+        padding: 1rem;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .protocol-item:hover {
+        border-color: #3b82f6;
+        background: #141720;
+      }
+
+      .protocol-item .id {
+        font-family: monospace;
+        font-size: 0.85rem;
+        color: #60a5fa;
+      }
+
+      .protocol-item .meta {
+        display: flex;
+        gap: 1rem;
+        margin-top: 0.5rem;
+        font-size: 0.8rem;
+        color: #6b7280;
+      }
+
+      .protocol-item .meta span {
+        display: flex;
+        align-items: center;
+        gap: 0.25rem;
+      }
+
+      /* ─── Info Box ─────────────────────────────────── */
+      .info-box {
+        background: #1e3a5f;
+        border: 1px solid #2563eb;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        font-size: 0.85rem;
+        color: #93c5fd;
+      }
+
+      .info-box strong {
+        color: #60a5fa;
+      }
+
+      /* ─── Hidden ───────────────────────────────────── */
+      .hidden {
+        display: none !important;
+      }
+
       /* ─── Animations ───────────────────────────────── */
       @keyframes fadeIn {
         from {
@@ -230,153 +311,311 @@
       .card {
         animation: fadeIn 0.4s ease-out;
       }
-      .card:nth-child(2) {
-        animation-delay: 0.1s;
-      }
-      .card:nth-child(3) {
-        animation-delay: 0.2s;
-      }
     </style>
   </head>
   <body>
     <div class="container">
-      <!-- Hero Section for API Endpoint -->
-      <div class="endpoint-hero">
-        <span class="method">POST</span>
-        <span class="url">/api/v1/protocol-executions</span>
-        <div class="description">
-          Initiate a simulation of a protocol execution
-        </div>
-      </div>
-
       <header>
-        <h1>⚡ Protocol Execution Tester</h1>
+        <h1>📋 Execution Protocol API</h1>
+        <p>
+          Contract-First Integration Prototype
+          <span class="badge">Read-Only</span>
+        </p>
       </header>
 
-      <!-- ─── Request Form ──────────────────────────── -->
-      <div class="card">
-        <h2>🔑 Request</h2>
-        <div class="form-group">
-          <label for="apiKey">API Key (X-API-Key)</label>
-          <input type="text" id="apiKey" value="rh_test_alpha_92f4c1" />
+      <!-- ─── Tab Navigation ──────────────────────────── -->
+      <div class="tabs">
+        <div class="tab active" onclick="showTab('health')">
+          <span class="method">GET</span> /health
         </div>
-        <div class="form-group">
-          <label for="protocolId">Protocol ID</label>
-          <input type="text" id="protocolId" value="safety-check-v1" />
+        <div class="tab" onclick="showTab('list')">
+          <span class="method">GET</span> /execution-protocols
         </div>
-        <div class="form-group">
-          <label for="siteId">Site ID</label>
-          <input type="text" id="siteId" value="site-001" />
+        <div class="tab" onclick="showTab('single')">
+          <span class="method">GET</span> /execution-protocols/:id
         </div>
-        <div class="form-group">
-          <label for="webhookUrl">Webhook URL</label>
-          <input
-            type="text"
-            id="webhookUrl"
-            value="http://localhost:4001/webhook-receiver"
-          />
-        </div>
-        <button id="submitBtn" onclick="executeProtocol()">
-          Execute Protocol
-        </button>
       </div>
 
-      <!-- ─── API Response ──────────────────────────── -->
+      <!-- ─── Authentication Card ─────────────────────── -->
       <div class="card">
-        <h2>📡 API Response <span id="statusBadge"></span></h2>
-        <div id="apiResponse" class="output empty">Waiting for request…</div>
+        <h2>🔑 Authentication</h2>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="apiKey">API Key (X-API-Key)</label>
+            <select id="apiKey">
+              <option value="test-key-acme">test-key-acme (tenant-acme)</option>
+              <option value="test-key-globex">
+                test-key-globex (tenant-globex)
+              </option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <!-- ─── Webhook Events ────────────────────────── -->
-      <div class="card">
-        <h2>🔔 Webhook Events <span id="webhookCount"></span></h2>
-        <div id="webhookEvents" class="output empty">
-          No events received yet…
+      <!-- ─── Health Check Tab ────────────────────────── -->
+      <div id="tab-health" class="tab-content">
+        <div class="card">
+          <h2>💚 Health Check</h2>
+          <p style="color: #6b7280; margin-bottom: 1rem; font-size: 0.9rem">
+            Check if the API server is running. No authentication required.
+          </p>
+          <button onclick="checkHealth()">Check Health</button>
+        </div>
+      </div>
+
+      <!-- ─── List Protocols Tab ──────────────────────── -->
+      <div id="tab-list" class="tab-content hidden">
+        <div class="card">
+          <h2>📋 List Protocols (Polling)</h2>
+          <div class="info-box">
+            <strong>Polling Pattern:</strong> Use <code>updatedAfter</code> to
+            fetch only protocols updated since your last sync. Store the max
+            <code>updatedAt</code> value as your cursor.
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label for="updatedAfter">Updated After (ISO 8601)</label>
+              <input
+                type="text"
+                id="updatedAfter"
+                placeholder="e.g., 2026-02-05T00:00:00Z"
+              />
+            </div>
+            <div class="form-group">
+              <label for="limit">Limit</label>
+              <input type="number" id="limit" value="50" min="1" max="100" />
+            </div>
+            <div class="form-group">
+              <label for="offset">Offset</label>
+              <input type="number" id="offset" value="0" min="0" />
+            </div>
+          </div>
+          <button onclick="listProtocols()">Fetch Protocols</button>
+        </div>
+
+        <div class="card">
+          <h2>📊 Results <span id="listStatusBadge"></span></h2>
+          <div id="protocolList" class="protocol-list hidden"></div>
+          <div id="listResponse" class="output empty">
+            Click "Fetch Protocols" to load data…
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Single Protocol Tab ─────────────────────── -->
+      <div id="tab-single" class="tab-content hidden">
+        <div class="card">
+          <h2>📄 Get Protocol Snapshot</h2>
+          <div class="info-box">
+            <strong>Full Snapshot:</strong> Retrieve the complete protocol data
+            including sections, fields, validation, attachments, and report
+            metadata.
+          </div>
+          <div class="form-group">
+            <label for="protocolId">Protocol ID (UUID)</label>
+            <input
+              type="text"
+              id="protocolId"
+              placeholder="550e8400-e29b-41d4-a716-446655440001"
+            />
+          </div>
+          <div style="display: flex; gap: 0.5rem">
+            <button onclick="getProtocol()">Get Snapshot</button>
+            <button class="btn-secondary" onclick="loadSampleIds()">
+              Load Sample IDs
+            </button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>📊 Snapshot <span id="singleStatusBadge"></span></h2>
+          <div id="singleResponse" class="output empty">
+            Enter a Protocol ID and click "Get Snapshot"…
+          </div>
+        </div>
+      </div>
+
+      <!-- ─── Response Output ─────────────────────────── -->
+      <div id="tab-health-response" class="card">
+        <h2>📡 Response <span id="healthStatusBadge"></span></h2>
+        <div id="healthResponse" class="output empty">
+          Click "Check Health" to test the API…
         </div>
       </div>
     </div>
 
     <script>
-      const API_URL = "/api/v1/protocol-executions";
-      let polling = false;
+      const API_BASE = "/api/v1";
 
-      async function executeProtocol() {
-        const btn = document.getElementById("submitBtn");
-        const responseEl = document.getElementById("apiResponse");
-        const badgeEl = document.getElementById("statusBadge");
+      // ─── Tab Navigation ────────────────────────────────
+      function showTab(tabName) {
+        // Update tab buttons
+        document
+          .querySelectorAll(".tab")
+          .forEach((tab) => tab.classList.remove("active"));
+        event.target.closest(".tab").classList.add("active");
 
-        btn.disabled = true;
-        btn.textContent = "Sending…";
+        // Show/hide tab content
+        document
+          .querySelectorAll(".tab-content")
+          .forEach((el) => el.classList.add("hidden"));
+        document.getElementById(`tab-${tabName}`).classList.remove("hidden");
+
+        // Show/hide response card based on tab
+        const healthResponse = document.getElementById("tab-health-response");
+        healthResponse.classList.toggle("hidden", tabName !== "health");
+      }
+
+      // ─── Health Check ──────────────────────────────────
+      async function checkHealth() {
+        const responseEl = document.getElementById("healthResponse");
+        const badgeEl = document.getElementById("healthStatusBadge");
+
         responseEl.classList.remove("empty");
-        responseEl.textContent = "Sending request…";
+        responseEl.textContent = "Checking health…";
         badgeEl.innerHTML = '<span class="status wait">PENDING</span>';
 
-        const body = {
-          protocolId: document.getElementById("protocolId").value,
-          siteId: document.getElementById("siteId").value,
-          webhookUrl: document.getElementById("webhookUrl").value,
-        };
+        try {
+          const res = await fetch(`${API_BASE}/health`);
+          const data = await res.json();
+
+          responseEl.textContent = JSON.stringify(data, null, 2);
+          badgeEl.innerHTML = res.ok
+            ? '<span class="status ok">200 OK</span>'
+            : `<span class="status err">${res.status} ERROR</span>`;
+        } catch (err) {
+          responseEl.textContent = "Network error: " + err.message;
+          badgeEl.innerHTML = '<span class="status err">FAILED</span>';
+        }
+      }
+
+      // ─── List Protocols ────────────────────────────────
+      async function listProtocols() {
+        const responseEl = document.getElementById("listResponse");
+        const listEl = document.getElementById("protocolList");
+        const badgeEl = document.getElementById("listStatusBadge");
+        const apiKey = document.getElementById("apiKey").value;
+
+        responseEl.classList.remove("empty");
+        responseEl.textContent = "Fetching protocols…";
+        listEl.classList.add("hidden");
+        badgeEl.innerHTML = '<span class="status wait">PENDING</span>';
+
+        // Build query params
+        const params = new URLSearchParams();
+        const updatedAfter = document.getElementById("updatedAfter").value;
+        const limit = document.getElementById("limit").value;
+        const offset = document.getElementById("offset").value;
+
+        if (updatedAfter) params.append("updatedAfter", updatedAfter);
+        if (limit) params.append("limit", limit);
+        if (offset) params.append("offset", offset);
 
         try {
-          const res = await fetch(API_URL, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              "X-API-Key": document.getElementById("apiKey").value,
-            },
-            body: JSON.stringify(body),
+          const url = `${API_BASE}/execution-protocols${params.toString() ? "?" + params : ""}`;
+          const res = await fetch(url, {
+            headers: { "X-API-Key": apiKey },
           });
 
           const data = await res.json();
 
-          responseEl.textContent = JSON.stringify(data, null, 2);
+          if (res.ok && data.protocols && data.protocols.length > 0) {
+            // Show visual list
+            listEl.innerHTML = data.protocols
+              .map(
+                (p) => `
+              <div class="protocol-item" onclick="selectProtocol('${p.id}')">
+                <div class="id">${p.id}</div>
+                <div class="meta">
+                  <span>📍 ${p.siteId}</span>
+                  <span>🏭 ${p.plantId}</span>
+                  <span>✅ ${p.status}</span>
+                  <span>🕐 ${new Date(p.updatedAt).toLocaleString()}</span>
+                </div>
+              </div>
+            `,
+              )
+              .join("");
+            listEl.classList.remove("hidden");
+            responseEl.classList.add("hidden");
 
-          if (res.ok) {
-            badgeEl.innerHTML =
-              '<span class="status ok">' + res.status + " CREATED</span>";
-            // Start polling for webhook events
-            startPolling();
+            badgeEl.innerHTML = `<span class="status ok">${data.protocols.length} PROTOCOLS</span>`;
           } else {
-            badgeEl.innerHTML =
-              '<span class="status err">' + res.status + " ERROR</span>";
+            responseEl.textContent = JSON.stringify(data, null, 2);
+            badgeEl.innerHTML = res.ok
+              ? '<span class="status ok">0 PROTOCOLS</span>'
+              : `<span class="status err">${res.status} ERROR</span>`;
           }
         } catch (err) {
           responseEl.textContent = "Network error: " + err.message;
           badgeEl.innerHTML = '<span class="status err">FAILED</span>';
-        } finally {
-          btn.disabled = false;
-          btn.textContent = "Execute Protocol";
         }
       }
 
-      function startPolling() {
-        if (polling) return;
-        polling = true;
-
-        const interval = setInterval(async () => {
-          try {
-            const res = await fetch("/webhook-events");
-            const events = await res.json();
-
-            if (events.length > 0) {
-              const el = document.getElementById("webhookEvents");
-              const countEl = document.getElementById("webhookCount");
-              el.classList.remove("empty");
-              el.textContent = JSON.stringify(events, null, 2);
-              countEl.innerHTML =
-                '<span class="status ok">' + events.length + "</span>";
-            }
-          } catch {
-            /* ignore polling errors */
-          }
-        }, 1500);
-
-        // Stop polling after 15 seconds
-        setTimeout(() => {
-          clearInterval(interval);
-          polling = false;
-        }, 15000);
+      // ─── Select Protocol (from list) ───────────────────
+      function selectProtocol(id) {
+        document.getElementById("protocolId").value = id;
+        // Switch to single tab
+        document.querySelectorAll(".tab")[2].click();
+        getProtocol();
       }
+
+      // ─── Get Single Protocol ───────────────────────────
+      async function getProtocol() {
+        const responseEl = document.getElementById("singleResponse");
+        const badgeEl = document.getElementById("singleStatusBadge");
+        const apiKey = document.getElementById("apiKey").value;
+        const protocolId = document.getElementById("protocolId").value;
+
+        if (!protocolId) {
+          responseEl.textContent = "Please enter a Protocol ID";
+          badgeEl.innerHTML = '<span class="status err">NO ID</span>';
+          return;
+        }
+
+        responseEl.classList.remove("empty");
+        responseEl.textContent = "Fetching snapshot…";
+        badgeEl.innerHTML = '<span class="status wait">PENDING</span>';
+
+        try {
+          const res = await fetch(
+            `${API_BASE}/execution-protocols/${protocolId}`,
+            {
+              headers: { "X-API-Key": apiKey },
+            },
+          );
+
+          const data = await res.json();
+          responseEl.textContent = JSON.stringify(data, null, 2);
+
+          if (res.ok) {
+            badgeEl.innerHTML = '<span class="status ok">200 OK</span>';
+          } else {
+            badgeEl.innerHTML = `<span class="status err">${res.status} ${data.error || "ERROR"}</span>`;
+          }
+        } catch (err) {
+          responseEl.textContent = "Network error: " + err.message;
+          badgeEl.innerHTML = '<span class="status err">FAILED</span>';
+        }
+      }
+
+      // ─── Load Sample IDs ───────────────────────────────
+      function loadSampleIds() {
+        const sampleIds = [
+          "550e8400-e29b-41d4-a716-446655440001",
+          "550e8400-e29b-41d4-a716-446655440002",
+          "550e8400-e29b-41d4-a716-446655440003",
+        ];
+        document.getElementById("protocolId").value = sampleIds[0];
+        alert(
+          "Sample IDs (for tenant-acme with PostgreSQL):\n\n" +
+            sampleIds.join("\n") +
+            "\n\nFirst ID loaded into input field.",
+        );
+      }
+
+      // Initial health check on load
+      window.addEventListener("load", checkHealth);
     </script>
   </body>
 </html>

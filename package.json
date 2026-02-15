@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "dev": "node --watch server.js"
+    "dev": "node --watch server.js",
+    "db:init": "node scripts/initDatabase.js",
+    "db:seed": "node scripts/seedDatabase.js"
   },
   "keywords": [],
   "author": "",

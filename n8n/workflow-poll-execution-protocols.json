@@ -1,0 +1,312 @@
+{
+  "name": "Poll Execution Protocols API",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 5
+            }
+          ]
+        }
+      },
+      "id": "trigger-schedule",
+      "name": "Poll Every 5 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [220, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/api/v1/health",
+        "options": {}
+      },
+      "id": "health-check",
+      "name": "Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [440, 300]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "health-ok",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-health",
+      "name": "API Healthy?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [660, 300]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/api/v1/execution-protocols",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "limit",
+              "value": "50"
+            },
+            {
+              "name": "offset",
+              "value": "0"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-protocols",
+      "name": "Fetch Protocol List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 200]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-protocols",
+              "leftValue": "={{ $json.protocols.length }}",
+              "rightValue": "0",
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-protocols",
+      "name": "Has Protocols?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Extract protocol list from API response\nconst protocols = $input.first().json.protocols;\n\n// Return each protocol as a separate item for downstream processing\nreturn protocols.map(p => ({\n  json: {\n    id: p.id,\n    siteId: p.siteId,\n    plantId: p.plantId,\n    status: p.status,\n    closedAt: p.closedAt,\n    updatedAt: p.updatedAt\n  }\n}));"
+      },
+      "id": "split-protocols",
+      "name": "Split Into Individual Protocols",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1320, 100]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $env.API_BASE_URL }}/api/v1/execution-protocols/{{ $json.id }}/snapshot",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-API-Key",
+              "value": "={{ $env.API_KEY }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "json"
+            }
+          }
+        }
+      },
+      "id": "fetch-snapshot",
+      "name": "Fetch Full Snapshot",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1540, 100]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process each snapshot - this is where you add your business logic\nconst snapshot = $input.first().json;\n\n// Example: Extract key information for downstream use\nconst processed = {\n  protocolId: snapshot.id,\n  siteName: snapshot.site?.name || 'Unknown',\n  plantName: snapshot.plant?.name || 'Unknown',\n  templateName: snapshot.template?.name || 'Unknown',\n  inspectorName: snapshot.inspector?.name || 'Unknown',\n  status: snapshot.status,\n  closedAt: snapshot.closedAt,\n  isValid: snapshot.validation?.isValid || false,\n  validationErrors: snapshot.validation?.errors || [],\n  sectionCount: snapshot.sections?.length || 0,\n  attachmentCount: snapshot.attachments?.length || 0,\n  reportUrl: snapshot.report?.url || null,\n  processedAt: new Date().toISOString()\n};\n\nreturn [{ json: processed }];"
+      },
+      "id": "process-snapshot",
+      "name": "Process Snapshot Data",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1760, 100]
+    },
+    {
+      "parameters": {
+        "content": "=### Protocol Processed\n\n**Site:** {{ $json.siteName }}\n**Plant:** {{ $json.plantName }}\n**Inspector:** {{ $json.inspectorName }}\n**Status:** {{ $json.status }}\n**Valid:** {{ $json.isValid }}\n**Sections:** {{ $json.sectionCount }}\n**Attachments:** {{ $json.attachmentCount }}\n**Closed At:** {{ $json.closedAt }}",
+        "height": 340,
+        "width": 280
+      },
+      "id": "result-note",
+      "name": "Result Summary",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1980, -40]
+    },
+    {
+      "parameters": {
+        "content": "=### No Protocols Found\n\nThe API returned 0 protocols.\nThis is normal if no CLOSED protocols exist for this tenant.",
+        "height": 180,
+        "width": 280
+      },
+      "id": "no-data-note",
+      "name": "No Data Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1320, 260]
+    },
+    {
+      "parameters": {
+        "content": "=### API Unhealthy\n\nThe health check failed.\nCheck that the API server is running at:\n{{ $env.API_BASE_URL }}",
+        "height": 180,
+        "width": 280
+      },
+      "id": "unhealthy-note",
+      "name": "API Down Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [880, 400]
+    }
+  ],
+  "connections": {
+    "Poll Every 5 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Health Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Health Check": {
+      "main": [
+        [
+          {
+            "node": "API Healthy?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "API Healthy?": {
+      "main": [
+        [
+          {
+            "node": "Fetch Protocol List",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Fetch Protocol List": {
+      "main": [
+        [
+          {
+            "node": "Has Protocols?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Has Protocols?": {
+      "main": [
+        [
+          {
+            "node": "Split Into Individual Protocols",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Split Into Individual Protocols": {
+      "main": [
+        [
+          {
+            "node": "Fetch Full Snapshot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Full Snapshot": {
+      "main": [
+        [
+          {
+            "node": "Process Snapshot Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "name": "execution-protocols",
+      "id": "1"
+    },
+    {
+      "name": "integration",
+      "id": "2"
+    }
+  ],
+  "triggerCount": 1
+}

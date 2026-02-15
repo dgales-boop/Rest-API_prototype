@@ -2,48 +2,63 @@ require("dotenv").config();
 
 const express = require("express");
 const path = require("path");
-const { initDb } = require("./db");
-const protocolExecutionRoutes = require("./routes/protocolExecutions");
 
+// ─── Repository & Controller (Dependency Injection) ─────
+const PostgresExecutionProtocolRepository = require("./repository/postgresExecutionProtocolRepository");
+const ExecutionProtocolController = require("./controllers/executionProtocolController");
+const createExecutionProtocolRoutes = require("./routes/executionProtocols");
+
+// ─── Application Setup ──────────────────────────────────
 const app = express();
 const PORT = process.env.PORT || 4001;
 
-// ─── Middleware ──────────────────────────────────────────
+// ─── Middleware ─────────────────────────────────────────
 app.use(express.json());
 app.use(express.static(path.join(__dirname, "public")));
 
-// ─── In-memory webhook event log (for the test UI) ─────
-const webhookEvents = [];
+// ─── Dependency Injection: Wire up Repository → Controller → Routes ───
+// Current:  PostgreSQL with seeded test data
+// Future:   ReportheldAdapterRepository (when Reportheld API is available)
+const repository = new PostgresExecutionProtocolRepository();
+console.log("📊 Using PostgreSQL repository (database-backed)");
+
+const controller = new ExecutionProtocolController(repository);
+const executionProtocolRoutes = createExecutionProtocolRoutes(controller);
 
 // ─── API Routes ─────────────────────────────────────────
-app.use("/api/v1/protocol-executions", protocolExecutionRoutes);
 
-// ─── Built-in Webhook Receiver (for testing) ────────────
-app.post("/webhook-receiver", (req, res) => {
-  const event = {
-    receivedAt: new Date().toISOString(),
-    ...req.body,
-  };
-  webhookEvents.push(event);
-  console.log("📩 Webhook received:", JSON.stringify(event, null, 2));
-  res.status(200).json({ received: true });
+// Health check endpoint
+app.get("/api/v1/health", (req, res) => {
+  res.json({
+    status: "ok",
+    service: "Execution Protocol Integration API",
+    version: "1.0.0",
+    timestamp: new Date().toISOString(),
+  });
 });
 
-// ─── Webhook Events Feed (polled by the test UI) ────────
-app.get("/webhook-events", (req, res) => {
-  res.json(webhookEvents);
-});
+// Execution protocol endpoints (read-only)
+app.use("/api/v1/execution-protocols", executionProtocolRoutes);
 
 // ─── Start Server ───────────────────────────────────────
 async function start() {
   try {
-    await initDb();
     app.listen(PORT, () => {
-      console.log(`\n🚀 Server running at http://localhost:${PORT}`);
-      console.log(`📄 Test UI at    http://localhost:${PORT}/index.html`);
+      console.log(`\n🚀 Execution Protocol Integration API`);
+      console.log(`📡 Server running at http://localhost:${PORT}`);
       console.log(
-        `📡 API endpoint  POST http://localhost:${PORT}/api/v1/protocol-executions\n`,
+        `✅ Health check:     GET http://localhost:${PORT}/api/v1/health`,
       );
+      console.log(
+        `📋 List protocols:   GET http://localhost:${PORT}/api/v1/execution-protocols?updatedAfter=<ISO>&limit=50&offset=0`,
+      );
+      console.log(
+        `📄 Get protocol:     GET http://localhost:${PORT}/api/v1/execution-protocols/:id`,
+      );
+      console.log(
+        `📊 Get snapshot:     GET http://localhost:${PORT}/api/v1/execution-protocols/:id/snapshot`,
+      );
+      console.log(`\n🔐 All endpoints require X-API-Key header\n`);
     });
   } catch (err) {
     console.error("💥 Failed to start server:", err.message);

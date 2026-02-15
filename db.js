@@ -9,23 +9,33 @@ const pool = new Pool({
 });
 
 /**
- * Initialize database — create protocol_executions table if it doesn't exist.
+ * Initialize database — create execution_protocols table if it doesn't exist.
  */
 async function initDb() {
   const client = await pool.connect();
   try {
     await client.query(`
-      CREATE TABLE IF NOT EXISTS protocol_executions (
+      CREATE TABLE IF NOT EXISTS execution_protocols (
         id UUID PRIMARY KEY,
-        protocol_id VARCHAR(255) NOT NULL,
         site_id VARCHAR(255) NOT NULL,
+        plant_id VARCHAR(255) NOT NULL,
         tenant_id VARCHAR(255) NOT NULL,
-        status VARCHAR(50) NOT NULL DEFAULT 'initialized',
+        status VARCHAR(50) NOT NULL DEFAULT 'CLOSED',
+        snapshot JSONB NOT NULL,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        closed_at TIMESTAMPTZ,
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
+      
+      -- Index for efficient polling queries
+      CREATE INDEX IF NOT EXISTS idx_execution_protocols_polling 
+        ON execution_protocols(tenant_id, status, updated_at);
+      
+      -- Index for tenant isolation
+      CREATE INDEX IF NOT EXISTS idx_execution_protocols_tenant 
+        ON execution_protocols(tenant_id);
     `);
-    console.log("✅ Database initialized — protocol_executions table ready");
+    console.log("✅ Database initialized — execution_protocols table ready");
   } finally {
     client.release();
   }
