@@ -1,5 +1,5 @@
 {
-  "name": "Poll Execution Protocols API",
+  "name": "Execution Protocol Monitor & Quality Gate",
   "nodes": [
     {
       "parameters": {
@@ -36,7 +36,7 @@
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
@@ -63,19 +63,6 @@
       "parameters": {
         "method": "GET",
         "url": "={{ $env.API_BASE_URL }}/api/v1/execution-protocols",
-        "sendQuery": true,
-        "queryParameters": {
-          "parameters": [
-            {
-              "name": "limit",
-              "value": "50"
-            },
-            {
-              "name": "offset",
-              "value": "0"
-            }
-          ]
-        },
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -101,20 +88,30 @@
     },
     {
       "parameters": {
+        "jsCode": "// Extract protocols from API response and split into individual items\nconst response = $input.first().json;\nconst protocols = response.protocols || [];\nconst total = response.pagination?.total || 0;\n\nif (protocols.length === 0) {\n  // Return a flag so the next IF node can route to 'No Data'\n  return [{ json: { _empty: true, protocolCount: 0 } }];\n}\n\n// Each protocol becomes its own item — n8n processes them individually\nreturn protocols.map(p => ({\n  json: {\n    _empty: false,\n    id: p.id,\n    siteId: p.siteId,\n    plantId: p.plantId,\n    status: p.status,\n    closedAt: p.closedAt,\n    updatedAt: p.updatedAt,\n    protocolCount: total\n  }\n}));"
+      },
+      "id": "extract-protocols",
+      "name": "Extract Protocols",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1100, 200]
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
             "leftValue": "",
-            "typeValidation": "strict"
+            "typeValidation": "loose"
           },
           "conditions": [
             {
-              "id": "has-protocols",
-              "leftValue": "={{ $json.protocols.length }}",
-              "rightValue": "0",
+              "id": "has-data",
+              "leftValue": "={{ $json._empty }}",
+              "rightValue": false,
               "operator": {
-                "type": "number",
-                "operation": "gt"
+                "type": "boolean",
+                "operation": "equals"
               }
             }
           ],
@@ -122,26 +119,16 @@
         },
         "options": {}
       },
-      "id": "check-protocols",
+      "id": "check-has-protocols",
       "name": "Has Protocols?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [1100, 200]
-    },
-    {
-      "parameters": {
-        "jsCode": "// Extract protocol list from API response\nconst protocols = $input.first().json.protocols;\n\n// Return each protocol as a separate item for downstream processing\nreturn protocols.map(p => ({\n  json: {\n    id: p.id,\n    siteId: p.siteId,\n    plantId: p.plantId,\n    status: p.status,\n    closedAt: p.closedAt,\n    updatedAt: p.updatedAt\n  }\n}));"
-      },
-      "id": "split-protocols",
-      "name": "Split Into Individual Protocols",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [1320, 100]
+      "position": [1320, 200]
     },
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ $env.API_BASE_URL }}/api/v1/execution-protocols/{{ $json.id }}/snapshot",
+        "url": "={{ $env.API_BASE_URL }}/api/v1/execution-protocols/{{ $json.id }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -167,49 +154,127 @@
     },
     {
       "parameters": {
-        "jsCode": "// Process each snapshot - this is where you add your business logic\nconst snapshot = $input.first().json;\n\n// Example: Extract key information for downstream use\nconst processed = {\n  protocolId: snapshot.id,\n  siteName: snapshot.site?.name || 'Unknown',\n  plantName: snapshot.plant?.name || 'Unknown',\n  templateName: snapshot.template?.name || 'Unknown',\n  inspectorName: snapshot.inspector?.name || 'Unknown',\n  status: snapshot.status,\n  closedAt: snapshot.closedAt,\n  isValid: snapshot.validation?.isValid || false,\n  validationErrors: snapshot.validation?.errors || [],\n  sectionCount: snapshot.sections?.length || 0,\n  attachmentCount: snapshot.attachments?.length || 0,\n  reportUrl: snapshot.report?.url || null,\n  processedAt: new Date().toISOString()\n};\n\nreturn [{ json: processed }];"
+        "jsCode": "// ─── Quality Analysis Engine ───────────────────────────────\n// Analyzes each protocol snapshot for completeness, validity,\n// and quality indicators. Assigns a quality score (0-100).\n\nconst snapshot = $input.first().json;\n\nconst protocol = {\n  id: snapshot.id,\n  site: snapshot.site?.name || 'Unknown',\n  plant: snapshot.plant?.name || 'Unknown',\n  inspector: snapshot.inspector?.name || 'Unknown',\n  template: snapshot.template?.name || 'Unknown',\n  status: snapshot.status,\n  closedAt: snapshot.closedAt,\n\n  // Validation\n  isValid: snapshot.validation?.isValid ?? false,\n  validationErrors: snapshot.validation?.errors || [],\n  validationWarnings: snapshot.validation?.warnings || [],\n\n  // Completeness tracking\n  sectionCount: snapshot.sections?.length || 0,\n  totalFields: 0,\n  completedFields: 0,\n  requiredFieldsMissing: [],\n\n  // Attachments & report\n  attachmentCount: snapshot.attachments?.length || 0,\n  hasReport: !!snapshot.report?.url,\n\n  // Execution metadata\n  durationMinutes: snapshot.metadata?.executionDurationMinutes || 0,\n  completedSteps: snapshot.metadata?.completedSteps || 0,\n  totalSteps: snapshot.metadata?.totalSteps || 0,\n\n  // Quality scoring\n  completionRate: 0,\n  issues: [],\n  qualityScore: 100\n};\n\n// ── Analyze every field in every section ──\nif (snapshot.sections) {\n  for (const section of snapshot.sections) {\n    for (const field of (section.fields || [])) {\n      protocol.totalFields++;\n      if (field.value !== null && field.value !== undefined && field.value !== '') {\n        protocol.completedFields++;\n      }\n      if (field.required && !field.valid) {\n        protocol.requiredFieldsMissing.push(section.title + ' > ' + field.label);\n        protocol.issues.push('Required field invalid: ' + field.label);\n        protocol.qualityScore -= 10;\n      }\n    }\n  }\n}\n\n// ── Completeness rate ──\nprotocol.completionRate = protocol.totalFields > 0\n  ? Math.round((protocol.completedFields / protocol.totalFields) * 100)\n  : 0;\n\n// ── Quality deductions ──\nif (!protocol.isValid) {\n  protocol.issues.push('Validation failed');\n  protocol.qualityScore -= 20;\n}\n\nif (protocol.attachmentCount === 0) {\n  protocol.issues.push('No photos attached');\n  protocol.qualityScore -= 10;\n}\n\nif (!protocol.hasReport) {\n  protocol.issues.push('No report generated');\n  protocol.qualityScore -= 10;\n}\n\nif (protocol.durationMinutes > 0 && protocol.durationMinutes < 30) {\n  protocol.issues.push('Unusually short inspection (' + protocol.durationMinutes + ' min)');\n  protocol.qualityScore -= 15;\n}\n\nif (protocol.completionRate < 100) {\n  protocol.issues.push('Incomplete fields (' + protocol.completionRate + '% filled)');\n  protocol.qualityScore -= 5;\n}\n\nif (protocol.validationWarnings.length > 0) {\n  protocol.issues.push(protocol.validationWarnings.length + ' validation warning(s)');\n  protocol.qualityScore -= 5;\n}\n\n// ── Final score & grade ──\nprotocol.qualityScore = Math.max(0, Math.min(100, protocol.qualityScore));\nprotocol.passesQuality = protocol.qualityScore >= 70 && protocol.isValid;\nprotocol.grade = protocol.qualityScore >= 90 ? 'A' :\n                 protocol.qualityScore >= 80 ? 'B' :\n                 protocol.qualityScore >= 70 ? 'C' :\n                 protocol.qualityScore >= 50 ? 'D' : 'F';\n\nreturn [{ json: protocol }];"
       },
-      "id": "process-snapshot",
-      "name": "Process Snapshot Data",
+      "id": "analyze-quality",
+      "name": "Analyze Quality",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [1760, 100]
     },
     {
       "parameters": {
-        "content": "=### Protocol Processed\n\n**Site:** {{ $json.siteName }}\n**Plant:** {{ $json.plantName }}\n**Inspector:** {{ $json.inspectorName }}\n**Status:** {{ $json.status }}\n**Valid:** {{ $json.isValid }}\n**Sections:** {{ $json.sectionCount }}\n**Attachments:** {{ $json.attachmentCount }}\n**Closed At:** {{ $json.closedAt }}",
-        "height": 340,
-        "width": 280
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "quality-pass",
+              "leftValue": "={{ $json.passesQuality }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
       },
-      "id": "result-note",
-      "name": "Result Summary",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [1980, -40]
+      "id": "quality-gate",
+      "name": "Quality OK?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [1980, 100]
     },
     {
       "parameters": {
-        "content": "=### No Protocols Found\n\nThe API returned 0 protocols.\nThis is normal if no CLOSED protocols exist for this tenant.",
-        "height": 180,
-        "width": 280
+        "jsCode": "// Protocol passed quality gate — ready for archival / sync\nconst p = $input.first().json;\n\nreturn [{\n  json: {\n    result: 'PASSED',\n    grade: p.grade,\n    qualityScore: p.qualityScore,\n    protocol: p.id,\n    site: p.site,\n    plant: p.plant,\n    inspector: p.inspector,\n    completionRate: p.completionRate + '%',\n    attachments: p.attachmentCount,\n    hasReport: p.hasReport,\n    closedAt: p.closedAt,\n    action: 'Ready for archival / auto-sync'\n  }\n}];"
       },
-      "id": "no-data-note",
-      "name": "No Data Note",
-      "type": "n8n-nodes-base.stickyNote",
-      "typeVersion": 1,
-      "position": [1320, 260]
+      "id": "passed-output",
+      "name": "✅ Passed",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 0]
     },
     {
       "parameters": {
-        "content": "=### API Unhealthy\n\nThe health check failed.\nCheck that the API server is running at:\n{{ $env.API_BASE_URL }}",
+        "jsCode": "// Protocol FAILED quality gate — needs supervisor review\nconst p = $input.first().json;\n\nreturn [{\n  json: {\n    result: 'NEEDS REVIEW',\n    grade: p.grade,\n    qualityScore: p.qualityScore,\n    protocol: p.id,\n    site: p.site,\n    plant: p.plant,\n    inspector: p.inspector,\n    issues: p.issues,\n    missingFields: p.requiredFieldsMissing,\n    completionRate: p.completionRate + '%',\n    closedAt: p.closedAt,\n    action: 'Send to supervisor / create ticket'\n  }\n}];"
+      },
+      "id": "failed-output",
+      "name": "⚠️ Needs Review",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 200]
+    },
+    {
+      "parameters": {
+        "content": "### Quality Gate Workflow\n\nThis workflow polls the REST API every 5 minutes,\nfetches execution protocol snapshots, and runs\na **quality analysis** on each one.\n\n**Quality Score (0-100)** deducts points for:\n- Validation failures (-20)\n- Missing photos (-10)\n- No report generated (-10)\n- Short inspection time (-15)\n- Incomplete fields (-5 to -10)\n- Validation warnings (-5)\n\n**Grade:** A (90+) | B (80+) | C (70+) | D (50+) | F (<50)\n\n**Pass threshold:** Score >= 70 AND validation passed",
+        "height": 420,
+        "width": 320,
+        "color": 4
+      },
+      "id": "info-note",
+      "name": "Info Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-60, 120]
+    },
+    {
+      "parameters": {
+        "content": "### API Unreachable\n\nThe health check failed.\nCheck that the API is running at:\n{{ $env.API_BASE_URL }}\n\nRun: docker compose up -d",
         "height": 180,
-        "width": 280
+        "width": 280,
+        "color": 2
       },
       "id": "unhealthy-note",
       "name": "API Down Note",
       "type": "n8n-nodes-base.stickyNote",
       "typeVersion": 1,
       "position": [880, 400]
+    },
+    {
+      "parameters": {
+        "content": "### No Protocols Found\n\nThe API returned 0 protocols.\nThis is normal if no CLOSED protocols\nexist for this tenant.\n\nSeed the database:\ndocker exec proto-api\n  node scripts/seedDatabase.js",
+        "height": 220,
+        "width": 340,
+        "color": 3
+      },
+      "id": "no-data-note",
+      "name": "No Data Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [1320, 360]
+    },
+    {
+      "parameters": {
+        "content": "### ✅ Auto-Sync Ready\n\nProtocols that pass quality can be:\n- Archived automatically\n- Synced to external systems\n- Added to compliance reports\n\n**Next step:** Connect a Google Sheets,\nSlack, or email node here.",
+        "height": 210,
+        "width": 300,
+        "color": 4
+      },
+      "id": "passed-note",
+      "name": "Passed Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2420, -80]
+    },
+    {
+      "parameters": {
+        "content": "### ⚠️ Supervisor Alert\n\nProtocols that fail quality should be:\n- Sent to a supervisor for review\n- Flagged in a tracking system\n- Logged for audit trail\n\n**Next step:** Connect a Slack,\nemail, or Jira node here.",
+        "height": 210,
+        "width": 300,
+        "color": 2
+      },
+      "id": "review-note",
+      "name": "Review Note",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [2420, 160]
     }
   ],
   "connections": {
@@ -251,6 +316,17 @@
       "main": [
         [
           {
+            "node": "Extract Protocols",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract Protocols": {
+      "main": [
+        [
+          {
             "node": "Has Protocols?",
             "type": "main",
             "index": 0
@@ -262,7 +338,7 @@
       "main": [
         [
           {
-            "node": "Split Into Individual Protocols",
+            "node": "Fetch Full Snapshot",
             "type": "main",
             "index": 0
           }
@@ -270,22 +346,40 @@
         []
       ]
     },
-    "Split Into Individual Protocols": {
+    "Fetch Full Snapshot": {
       "main": [
         [
           {
-            "node": "Fetch Full Snapshot",
+            "node": "Analyze Quality",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "Fetch Full Snapshot": {
+    "Analyze Quality": {
       "main": [
         [
           {
-            "node": "Process Snapshot Data",
+            "node": "Quality OK?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Quality OK?": {
+      "main": [
+        [
+          {
+            "node": "✅ Passed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "⚠️ Needs Review",
             "type": "main",
             "index": 0
           }
@@ -304,7 +398,7 @@
       "id": "1"
     },
     {
-      "name": "integration",
+      "name": "quality-gate",
       "id": "2"
     }
   ],

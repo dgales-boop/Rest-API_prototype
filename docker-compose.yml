@@ -62,6 +62,9 @@ services:
       N8N_PROTOCOL: http
       WEBHOOK_URL: http://localhost:5678/
 
+      # ── Allow workflows to read env vars via {{ $env.VAR }} ──
+      N8N_BLOCK_ENV_ACCESS_IN_NODE: "false"
+
       # ── Variables available inside n8n workflows ──
       # Access these in n8n via: {{ $env.API_BASE_URL }}
       API_BASE_URL: http://api:4001 # ← container name, NOT localhost

@@ -97,14 +97,15 @@ The first `docker compose up -d` downloads images (~500MB). After that, it works
 
 ## Troubleshooting
 
-| Problem                                | Fix                                                          |
-| -------------------------------------- | ------------------------------------------------------------ |
-| `docker compose up` fails              | Open Docker Desktop first, wait for it to start              |
-| `docker exec` says container not found | Wait 30 seconds after `docker compose up -d`, then retry     |
-| Port 4001 already in use               | Run `docker compose down` first, then `docker compose up -d` |
-| Port 5678 already in use               | Stop your other n8n instance first                           |
-| n8n can't reach the API                | URL inside n8n must be `http://api:4001` (NOT `localhost`)   |
-| API returns 0 protocols                | Run `docker exec proto-api node scripts/seedDatabase.js`     |
+| Problem                                | Fix                                                              |
+| -------------------------------------- | ---------------------------------------------------------------- |
+| `docker compose up` fails              | Open Docker Desktop first, wait for it to start                  |
+| `docker exec` says container not found | Wait 30 seconds after `docker compose up -d`, then retry         |
+| Port 4001 already in use               | Run `docker compose down` first, then `docker compose up -d`     |
+| Port 5678 already in use               | Stop your other n8n instance first                               |
+| "container name already in use"        | Run `docker rm -f proto-postgres proto-api proto-n8n` then retry |
+| n8n can't reach the API                | URL inside n8n must be `http://api:4001` (NOT `localhost`)       |
+| API returns 0 protocols                | Run `docker exec proto-api node scripts/seedDatabase.js`         |
 
 ---
 
