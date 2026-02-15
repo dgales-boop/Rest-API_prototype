@@ -109,15 +109,9 @@ When Reportheld integration is ready, we swap the data source (PostgreSQL → Re
 ### How do I start the server?
 
 ```bash
-# Start PostgreSQL
-docker compose -f data/docker-compose.yml up -d
-
-# Set up database
-npm run db:init
-npm run db:seed
-
-# Start
-npm start
+docker compose up -d
+docker exec proto-api node scripts/initDatabase.js
+docker exec proto-api node scripts/seedDatabase.js
 ```
 
 ### How do I test the API?

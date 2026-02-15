@@ -32,10 +32,9 @@ The database is seeded with 5 protocols:
 Setup:
 
 ```bash
-docker compose -f data/docker-compose.yml up -d
-npm run db:init
-npm run db:seed
-npm start
+docker compose up -d
+docker exec proto-api node scripts/initDatabase.js
+docker exec proto-api node scripts/seedDatabase.js
 ```
 
 ---

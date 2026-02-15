@@ -4,6 +4,107 @@
 
 This guide explains how to import and configure the n8n workflow that polls our Execution Protocol Integration API. The workflow runs on a schedule, fetches protocol data, retrieves full snapshots, and processes them for downstream use.
 
+## Docker Networking (Why `localhost` Doesn't Work)
+
+When both n8n and the REST API run in Docker, `localhost` inside n8n refers to **n8n's own container** — not your host machine and not the API container. This is why connection attempts to `http://localhost:4001` fail from inside n8n.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                    Docker Network                            │
+│                                                              │
+│  ┌──────────────┐   ┌──────────────┐   ┌──────────────────┐ │
+│  │   postgres   │   │     api      │   │       n8n        │ │
+│  │   :5432      │   │    :4001     │   │      :5678       │ │
+│  └──────────────┘   └──────────────┘   └──────────────────┘ │
+│         ▲                  ▲                   │             │
+│         │                  │                   │             │
+│         └──────────────────┴───────────────────┘             │
+│              Containers reach each other by NAME             │
+│              e.g. http://api:4001                            │
+└──────────────────────────────────────────────────────────────┘
+         │                  │                   │
+     localhost:5432     localhost:4001     localhost:5678
+         │                  │                   │
+┌────────┴──────────────────┴───────────────────┴──────────────┐
+│                     Your Host Machine                        │
+│              (Browser, Postman, curl, etc.)                  │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### URL Rules
+
+| Context                                    | Correct URL                        | Why                          |
+| ------------------------------------------ | ---------------------------------- | ---------------------------- |
+| **n8n → REST API** (both in Docker)        | `http://api:4001`                  | Containers use service names |
+| **Browser → REST API** (from host)         | `http://localhost:4001`            | Host uses published ports    |
+| **Browser → n8n** (from host)              | `http://localhost:5678`            | Host uses published ports    |
+| **n8n → API** (n8n in Docker, API on host) | `http://host.docker.internal:4001` | Special Docker DNS for host  |
+
+---
+
+## Quick Start (Recommended)
+
+The project includes a `docker-compose.yml` at the project root that runs PostgreSQL, the REST API, and n8n together on one shared network.
+
+### Step 1: Start All Services
+
+```powershell
+# From the project root
+docker compose up -d
+```
+
+This starts three containers:
+
+| Service    | Container        | Port | URL from host           |
+| ---------- | ---------------- | ---- | ----------------------- |
+| PostgreSQL | `proto-postgres` | 5432 | `localhost:5432`        |
+| REST API   | `proto-api`      | 4001 | `http://localhost:4001` |
+| n8n        | `proto-n8n`      | 5678 | `http://localhost:5678` |
+
+### Step 2: Initialize the Database
+
+```powershell
+# Run database init and seed inside the API container
+docker exec proto-api node scripts/initDatabase.js
+docker exec proto-api node scripts/seedDatabase.js
+```
+
+### Step 3: Verify the API
+
+```powershell
+# From your host machine (browser or terminal)
+Invoke-WebRequest -Uri "http://localhost:4001/api/v1/health" -UseBasicParsing | Select-Object -ExpandProperty Content
+```
+
+### Step 4: Open n8n
+
+Open `http://localhost:5678` in your browser.
+
+The environment variables `API_BASE_URL` (`http://api:4001`) and `API_KEY` (`test-key-acme`) are already set in the docker-compose.yml. The workflow can use them immediately via `{{ $env.API_BASE_URL }}` and `{{ $env.API_KEY }}`.
+
+### Step 5: Import the Workflow
+
+1. Click **"Add workflow"** (or the `+` button)
+2. Click the **three dots menu** (⋮) in the top right
+3. Select **"Import from File..."**
+4. Browse to `n8n/workflow-poll-execution-protocols.json` and select it
+5. The workflow will appear in the editor canvas
+
+### Step 6: Test the Workflow
+
+1. Click **"Test workflow"** (play button)
+2. Watch each node execute — click on any node to see its output
+3. Verify:
+   - **Health Check** returns `{ status: "ok" }`
+   - **Fetch Protocol List** returns 3 protocols
+   - **Fetch Full Snapshot** returns complete snapshot JSON
+
+### Step 7: Activate
+
+Toggle the **"Active"** switch in the top-right corner. The workflow will now run automatically every 5 minutes.
+
+---
+
 ## Workflow Architecture
 
 ```
@@ -31,78 +132,37 @@ This guide explains how to import and configure the n8n workflow that polls our 
 
 ---
 
-## Prerequisites
+## Alternative: n8n Already Running Separately
 
-- **n8n** installed and running (self-hosted or cloud)
-- **REST API server** running on a reachable URL
-- **API key** configured (e.g., `test-key-acme`)
+If you already have an n8n instance running in its own Docker setup and don't want to use the combined docker-compose, you have two options:
 
----
+### Option A: Shared Docker Network (Recommended)
 
-## Step-by-Step Import Instructions
+Create a shared network and connect both containers:
 
-### Step 1: Open n8n
+```powershell
+# Create a shared network
+docker network create proto-network
 
-Navigate to your n8n instance (e.g., `http://localhost:5678`).
+# Connect your existing n8n container
+docker network connect proto-network <your-n8n-container-name>
 
-### Step 2: Import the Workflow
-
-1. Click **"Add workflow"** (or the `+` button)
-2. Click the **three dots menu** (⋮) in the top right
-3. Select **"Import from File..."**
-4. Browse to `n8n/workflow-poll-execution-protocols.json` and select it
-5. The workflow will appear in the editor canvas
-
-### Step 3: Configure Environment Variables
-
-The workflow uses n8n environment variables (not hardcoded values). Set these in your n8n instance:
-
-| Variable       | Value                   | Description                |
-| -------------- | ----------------------- | -------------------------- |
-| `API_BASE_URL` | `http://localhost:4001` | Your REST API server URL   |
-| `API_KEY`      | `test-key-acme`         | API key for authentication |
-
-**How to set environment variables in n8n:**
-
-**Option A — Self-hosted (recommended):**
-Add to your n8n `.env` file or Docker environment:
-
-```ini
-N8N_CUSTOM_EXTENSIONS=""
+# Start the API stack on the same network
+docker compose up -d
+docker network connect proto-network proto-api
 ```
 
-Then set via n8n's Settings → Variables:
+Then use `http://proto-api:4001` as the API URL inside n8n.
 
-1. Go to **Settings** → **Variables** (or **Environment Variables**)
-2. Add `API_BASE_URL` = `http://localhost:4001`
-3. Add `API_KEY` = `test-key-acme`
+### Option B: Use `host.docker.internal`
 
-**Option B — Docker Compose:**
+If you don't want to manage networks, and the API port is published to the host:
 
-```yaml
-environment:
-  - API_BASE_URL=http://host.docker.internal:4001
-  - API_KEY=test-key-acme
-```
+1. In n8n, go to **Settings** → **Variables**
+2. Set `API_BASE_URL` = `http://host.docker.internal:4001`
+3. Set `API_KEY` = `test-key-acme`
 
-> **Note:** If n8n runs in Docker and your API runs on the host, use `host.docker.internal` instead of `localhost`.
-
-### Step 4: Test the Workflow
-
-1. Click **"Test workflow"** (play button) in the n8n editor
-2. Watch each node execute in sequence
-3. Click on any node to see its input/output data
-4. Verify:
-   - Health Check returns `{ status: "ok" }`
-   - Fetch Protocol List returns protocols array
-   - Each snapshot is fetched and processed
-
-### Step 5: Activate the Workflow
-
-Once testing passes:
-
-1. Toggle the **"Active"** switch in the top-right corner
-2. The workflow will now run automatically every 5 minutes
+This routes traffic through the host machine. Works on Docker Desktop (Windows/Mac). On Linux, add `--add-host=host.docker.internal:host-gateway` to your n8n container.
 
 ---
 
@@ -141,73 +201,62 @@ After the **"Process Snapshot Data"** node, you can add:
 
 ---
 
-## Authentication Considerations
-
-### Current (Prototype)
-
-- API key sent via `X-API-Key` header
-- Keys are static strings mapped to tenants in the API's `.env`
-- The workflow uses `$env.API_KEY` to avoid hardcoding
-
-### Production (Future)
-
-When Reportheld integration is live, authentication may change:
-
-| Scenario          | What to Update                                       |
-| ----------------- | ---------------------------------------------------- |
-| Same API key auth | Only change `API_KEY` value                          |
-| OAuth 2.0         | Add n8n OAuth2 credential, update HTTP Request nodes |
-| JWT tokens        | Add a token refresh node before API calls            |
-
----
-
 ## Modifying for Reportheld Integration
 
-When Reportheld integration goes live, the workflow itself **does not change**. Here's why:
+When Reportheld integration goes live, the workflow itself **does not change**. The API endpoints, JSON contract, and authentication all stay the same. You may only need to:
 
-### What Stays the Same
-
-- All workflow nodes (same endpoint URLs)
-- All query parameters (`updatedAfter`, `limit`, `offset`)
-- All response parsing logic (same JSON contract)
-- Authentication headers
-
-### What You Might Change
-
-| Change           | Where              | Why                                     |
-| ---------------- | ------------------ | --------------------------------------- |
-| `API_BASE_URL`   | n8n Variables      | If API moves to production server       |
-| `API_KEY`        | n8n Variables      | New production API key                  |
-| Polling interval | Schedule node      | Production may need different frequency |
-| Error handling   | Add error workflow | Production needs alerting               |
-
-### Adding Reportheld-Specific Nodes (Optional)
-
-If you want the workflow to also call Reportheld directly (bypass our API):
-
-```
-[Schedule] → [Call Reportheld API] → [Transform Data] → [Send to Our API]
-```
-
-This is optional — the recommended approach is to keep calling our API, which handles Reportheld internally via the adapter pattern.
+| Change           | Where                          | Why                                     |
+| ---------------- | ------------------------------ | --------------------------------------- |
+| `API_BASE_URL`   | n8n Variables / docker-compose | If API moves to production server       |
+| `API_KEY`        | n8n Variables / docker-compose | New production API key                  |
+| Polling interval | Schedule node                  | Production may need different frequency |
 
 ---
 
 ## Troubleshooting
 
-| Problem              | Cause                   | Fix                                                         |
-| -------------------- | ----------------------- | ----------------------------------------------------------- |
-| Health Check fails   | API server not running  | Start server: `npm start`                                   |
-| 401 Unauthorized     | Wrong API key           | Check `API_KEY` env var in n8n                              |
-| 0 protocols returned | Wrong tenant or no data | Verify API key maps to correct tenant                       |
-| Connection refused   | Network issue           | Check `API_BASE_URL`, use `host.docker.internal` for Docker |
-| Timeout errors       | API too slow            | Increase timeout in HTTP Request node settings              |
+| Problem                            | Cause                                   | Fix                                                                        |
+| ---------------------------------- | --------------------------------------- | -------------------------------------------------------------------------- |
+| `ECONNREFUSED` at `localhost:4001` | n8n can't reach API via `localhost`     | Use `http://api:4001` (same compose) or `http://host.docker.internal:4001` |
+| Health Check fails                 | API container not running               | `docker compose ps` — check `proto-api` is up                              |
+| 401 Unauthorized                   | Wrong API key                           | Verify `API_KEY` env var matches a key in the API's `API_KEYS` config      |
+| 0 protocols returned               | Database not seeded                     | Run `docker exec proto-api node scripts/seedDatabase.js`                   |
+| `getaddrinfo ENOTFOUND api`        | Containers on different Docker networks | Use shared network or `host.docker.internal`                               |
+
+---
+
+## Useful Docker Commands
+
+```powershell
+# Check all containers are running
+docker compose ps
+
+# View API logs
+docker compose logs -f api
+
+# View n8n logs
+docker compose logs -f n8n
+
+# Restart just the API
+docker compose restart api
+
+# Re-seed the database
+docker exec proto-api node scripts/seedDatabase.js
+
+# Stop everything
+docker compose down
+
+# Stop and delete all data (database + n8n)
+docker compose down -v
+```
 
 ---
 
 ## Files
 
-| File                                         | Purpose                 |
-| -------------------------------------------- | ----------------------- |
-| `n8n/workflow-poll-execution-protocols.json` | Importable n8n workflow |
-| `docs/guides/N8N-INTEGRATION.md`             | This guide              |
+| File                                         | Purpose                            |
+| -------------------------------------------- | ---------------------------------- |
+| `docker-compose.yml`                         | Full stack: PostgreSQL + API + n8n |
+| `Dockerfile`                                 | Builds the REST API container      |
+| `n8n/workflow-poll-execution-protocols.json` | Importable n8n workflow            |
+| `docs/guides/N8N-INTEGRATION.md`             | This guide                         |

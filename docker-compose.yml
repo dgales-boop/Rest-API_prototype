@@ -1,0 +1,76 @@
+# ─────────────────────────────────────────────────────────────
+# Full Stack: PostgreSQL + REST API + n8n
+# All services on one shared network so they can communicate.
+#
+# Usage:
+#   docker compose up -d          # Start everything
+#   docker compose logs -f api    # Watch API logs
+#   docker compose down           # Stop everything
+#   docker compose down -v        # Stop + delete database data
+# ─────────────────────────────────────────────────────────────
+
+services:
+  # ── PostgreSQL Database ──────────────────────────────────
+  postgres:
+    image: postgres:15-alpine
+    container_name: proto-postgres
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: proto_user
+      POSTGRES_PASSWORD: proto_secret
+      POSTGRES_DB: proto_db
+    volumes:
+      - proto_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U proto_user -d proto_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ── REST API ─────────────────────────────────────────────
+  api:
+    build: .
+    container_name: proto-api
+    restart: unless-stopped
+    ports:
+      - "4001:4001"
+    environment:
+      PORT: 4001
+      DB_HOST: postgres # ← container name, NOT localhost
+      DB_PORT: 5432
+      DB_USER: proto_user
+      DB_PASSWORD: proto_secret
+      DB_NAME: proto_db
+      API_KEYS: '{"test-key-acme":"tenant-acme","test-key-globex":"tenant-globex"}'
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # ── n8n Workflow Automation ──────────────────────────────
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: proto-n8n
+    restart: unless-stopped
+    ports:
+      - "5678:5678"
+    environment:
+      # n8n basic config
+      N8N_HOST: 0.0.0.0
+      N8N_PORT: 5678
+      N8N_PROTOCOL: http
+      WEBHOOK_URL: http://localhost:5678/
+
+      # ── Variables available inside n8n workflows ──
+      # Access these in n8n via: {{ $env.API_BASE_URL }}
+      API_BASE_URL: http://api:4001 # ← container name, NOT localhost
+      API_KEY: test-key-acme
+    volumes:
+      - n8n_data:/home/node/.n8n
+    depends_on:
+      - api
+
+volumes:
+  proto_pgdata:
+  n8n_data:

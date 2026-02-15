@@ -131,29 +131,25 @@ curl -H "X-API-Key: test-key-acme" \
 
 PostgreSQL is the data source. Use Docker to run it:
 
-### 1. Start PostgreSQL
+### 1. Start All Services
 
 ```bash
-docker compose -f data/docker-compose.yml up -d
+docker compose up -d
 ```
 
 ### 2. Initialize Database
 
 ```bash
-npm run db:init
+docker exec proto-api node scripts/initDatabase.js
 ```
 
 ### 3. Seed Test Data
 
 ```bash
-npm run db:seed
+docker exec proto-api node scripts/seedDatabase.js
 ```
 
-### 4. Start the Server
-
-```bash
-npm start
-```
+The API is now running at `http://localhost:4001` and n8n at `http://localhost:5678`.
 
 ---
 
@@ -182,6 +178,8 @@ npm start
 REST_API/
 ├── server.js                 # Application entry point
 ├── db.js                     # Database connection
+├── docker-compose.yml       # Full stack (PostgreSQL + API + n8n)
+├── Dockerfile                # API container build
 ├── package.json              # Dependencies
 │
 ├── controllers/              # Request handlers

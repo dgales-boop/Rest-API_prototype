@@ -44,24 +44,23 @@ DB_PASSWORD=proto_secret
 DB_NAME=proto_db
 
 # Repository Type: PostgreSQL
-# Requires Docker: docker compose -f data/docker-compose.yml up -d
-# Then: npm run db:init && npm run db:seed
+# Handled by docker-compose.yml automatically
 
 # API Keys (JSON object mapping keys to tenant IDs)
 API_KEYS={"test-key-acme":"tenant-acme","test-key-globex":"tenant-globex"}
 ```
 
-### 3. Set Up Database
+### 3. Start Everything
 
 ```bash
-# Start PostgreSQL via Docker
-docker compose -f data/docker-compose.yml up -d
+docker compose up -d
+```
 
-# Create tables
-npm run db:init
+### 4. Initialize Database
 
-# Seed test data
-npm run db:seed
+```bash
+docker exec proto-api node scripts/initDatabase.js
+docker exec proto-api node scripts/seedDatabase.js
 ```
 
 ### 4. Start the Server
@@ -97,7 +96,7 @@ curl -H "X-API-Key: test-key-acme" http://localhost:4001/api/v1/execution-protoc
 
 ## PostgreSQL Details
 
-The database runs via Docker using the included `data/docker-compose.yml`.
+The database runs inside Docker via the root `docker-compose.yml`.
 
 ### Manual PostgreSQL Setup (alternative to Docker)
 
@@ -111,7 +110,7 @@ GRANT ALL PRIVILEGES ON DATABASE proto_db TO proto_user;
 Or use the included Docker Compose (recommended):
 
 ```bash
-docker compose -f data/docker-compose.yml up -d
+docker compose up -d
 ```
 
 ### Initialize Database Schema
